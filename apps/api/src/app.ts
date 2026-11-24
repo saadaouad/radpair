@@ -9,6 +9,9 @@ import {
 
 import { closeDatabase } from '@/db/connection.ts';
 import { env } from '@/env.ts';
+import { registerImageRoutes } from '@/features/images/routes.ts';
+import { registerReportRoutes } from '@/features/reports/routes.ts';
+import { registerStudyRoutes } from '@/features/studies/routes.ts';
 import { registerErrorHandler } from '@/plugins/errorHandler.ts';
 import { registerHealthRoute } from '@/routes/health.ts';
 
@@ -34,6 +37,9 @@ export const createApp = async () => {
 
   registerErrorHandler(app);
   registerHealthRoute(app);
+  await app.register(registerStudyRoutes, { prefix: '/api' });
+  await app.register(registerImageRoutes, { prefix: '/api' });
+  await app.register(registerReportRoutes, { prefix: '/api' });
 
   app.addHook('onClose', async () => {
     await closeDatabase();

@@ -40,7 +40,7 @@ The report `content` JSON is where a key image sits. The node stores `imageId`. 
 
 Placement is "insert at cursor" from the selected filmstrip image, plus `Mod+Shift+K`. Up and Down move the block. Remove deletes it. The same image can appear only once. Deleting a neighboring paragraph leaves the image in place. The image is removed when its own block is deleted.
 
-Studies are seeded with an empty report, so a version always exists. The first successful save moves `unread` to `draft`. Sign sets `signed` and `signed_at`. Signing an empty report is allowed, and the confirm dialog warns first.
+Studies are seeded with an empty report, so a version always exists. The first successful save moves `unread` to `draft`. Sign sets `signed` and `signed_at`. Signing requires text or a key image. The server rejects an empty report.
 
 Saves send the document and the version the editor loaded. The update runs only when that version still matches and the report is not signed. A stale save returns `409` `version_conflict` and includes the current document and version. A write after sign returns `403` `report_signed`. The editor keeps the local text. Autosave stops. The user chooses either to load the other version or to overwrite with theirs. A `409` is never retried on its own.
 
@@ -56,13 +56,17 @@ Images are synthetic files in `apps/web/public/studies`. Seed eight studies: fou
 
 ```
 GET   /health
-GET   /studies
-GET   /studies/:id
-PATCH /reports/:id
-POST  /reports/:id/sign
+GET   /api/studies
+GET   /api/studies/:id
+GET   /api/studies/:id/images
+GET   /api/studies/:id/report
+GET   /api/reports/:id
+PUT   /api/reports/:id
+POST  /api/reports/:id/sign
+GET   /api/reports/:id/history
 ```
 
-`/health` is the only route that exists today.
+A save sends `{ content, expectedVersion }`. Signing sends `{ expectedVersion }`.
 
 Errors use one body:
 
