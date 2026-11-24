@@ -1,0 +1,38 @@
+{
+  "name": "api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsup",
+    "check-types": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format .",
+    "format:fix": "biome format --write .",
+    "test:unit": "vitest run --config ../../packages/vitest-config/vitest.config.ts --project api-unit",
+    "test:integration": "vitest run --config ../../packages/vitest-config/vitest.config.ts --project api-integration"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/helmet": "^13.0.2",
+    "@repo/schema-validation": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "fastify": "^5.8.5",
+    "fastify-type-provider-zod": "4.0.1",
+    "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.15",
+    "@repo/typescript-config": "workspace:*",
+    "@repo/vitest-config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "@types/pg": "^8.20.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.19.4",
+    "typescript": "5.9.2",
+    "vitest": "^4.1.6"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "radpair",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format .",
+    "format:fix": "biome format --write .",
+    "check-types": "turbo run check-types",
+    "test:unit": "turbo run test:unit",
+    "test:integration": "turbo run test:integration"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.15",
+    "@repo/biome-config": "workspace:*",
+    "turbo": "^2.9.8",
+    "typescript": "5.9.2"
+  },
+  "engines": {
+    "node": "24.x"
+  },
+  "packageManager": "pnpm@11.25.0"
+}
