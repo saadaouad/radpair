@@ -14,7 +14,11 @@
     "format": "biome format .",
     "format:fix": "biome format --write .",
     "test:unit": "vitest run --config ../../packages/vitest-config/vitest.config.ts --project api-unit",
-    "test:integration": "vitest run --config ../../packages/vitest-config/vitest.config.ts --project api-integration"
+    "test:integration": "vitest run --config ../../packages/vitest-config/vitest.config.ts --project api-integration",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:placeholders": "tsx src/db/writePlaceholders.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
@@ -31,6 +35,7 @@
     "@repo/vitest-config": "workspace:*",
     "@types/node": "^24.10.1",
     "@types/pg": "^8.20.0",
+    "drizzle-kit": "^0.31.11",
     "tsup": "^8.5.1",
     "tsx": "^4.19.4",
     "typescript": "5.9.2",

@@ -35,4 +35,11 @@ pnpm test:integration
 
 `pnpm test:integration` reads `apps/api/.env.test` and refuses to run when that URL points at the same database as `apps/api/.env`.
 
+```bash
+pnpm db:migrate
+pnpm db:seed
+APP_ENV=test pnpm --filter api db:migrate
+APP_ENV=test pnpm --filter api db:seed
+```
+
 Product decisions for the rest of the build are in `AGENTS.md`.

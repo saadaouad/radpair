@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640" viewBox="0 0 640 640" role="img" aria-label="MR Lumbar spine image 1">
+  <rect width="640" height="640" fill="#292524"/>
+  <rect x="32" y="32" width="576" height="576" fill="none" stroke="#d6d3d1" stroke-width="2"/>
+  <text x="56" y="140" fill="#f6f4ef" font-family="sans-serif" font-size="48">MR</text>
+  <text x="56" y="200" fill="#d6d3d1" font-family="sans-serif" font-size="32">Lumbar spine</text>
+  <text x="56" y="560" fill="#a8a29e" font-family="sans-serif" font-size="24">Image 1</text>
+</svg>

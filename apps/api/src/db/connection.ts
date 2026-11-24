@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 
 import { postgresSsl } from '@/databaseGuard.ts';
 import { env } from '@/env.ts';
+import * as schema from '@/db/schema.ts';
 
 const globalForDb = globalThis as unknown as { pool?: Pool; poolClosed?: boolean };
 
@@ -19,11 +20,11 @@ const createPool = () => {
 
 export const pool = globalForDb.pool ?? createPool();
 
-if (env.APP_STAGE === 'dev') {
+if (env.APP_ENV === 'dev') {
   globalForDb.pool = pool;
 }
 
-export const db = drizzle({ client: pool });
+export const db = drizzle({ client: pool, schema });
 
 export const pingDatabase = async () => {
   await db.execute(sql`select 1`);

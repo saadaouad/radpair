@@ -19,7 +19,7 @@ There is no login, no DICOM, no object storage, no Redis, and no rate limiting.
 
 ## Environments
 
-`APP_STAGE` is `dev`, `test`, or `prod`.
+`APP_ENV` is `dev`, `test`, or `prod`. An existing `APP_STAGE` value is still accepted when `APP_ENV` is unset.
 
 - Local development loads `apps/api/.env` and uses the Neon dev project.
 - Tests load `apps/api/.env.test` and use the Neon test project.
@@ -36,7 +36,7 @@ The report is a TipTap document stored as JSON. A key image is a block node in t
 { "type": "keyImage", "attrs": { "imageId": "…", "caption": "…" } }
 ```
 
-The document is the only record of where a key image sits. The node stores `imageId`. The study payload carries the image URL.
+The report `content` JSON is where a key image sits. The node stores `imageId`. The study payload carries the image URL. `report_revisions` stores snapshots of that same JSON.
 
 Placement is "insert at cursor" from the selected filmstrip image, plus `Mod+Shift+K`. Up and Down move the block. Remove deletes it. The same image can appear only once. Deleting a neighboring paragraph leaves the image in place. The image is removed when its own block is deleted.
 

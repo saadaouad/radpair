@@ -35,7 +35,7 @@ export default defineConfig({
           environment: 'node',
           include: ['apps/api/tests/integration/**/*.test.ts'],
           env: {
-            APP_STAGE: 'test',
+            APP_ENV: 'test',
             NODE_ENV: 'test'
           },
           testTimeout: 20_000,

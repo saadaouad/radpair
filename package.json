@@ -12,7 +12,10 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:unit": "turbo run test:unit",
-    "test:integration": "turbo run test:integration"
+    "test:integration": "turbo run test:integration",
+    "db:generate": "pnpm --filter api db:generate",
+    "db:migrate": "pnpm --filter api db:migrate",
+    "db:seed": "pnpm --filter api db:seed"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
