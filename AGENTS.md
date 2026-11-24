@@ -82,7 +82,7 @@ Save and sign go through one update function. Routes do not update the row thems
 
 ```
 apps/api                 Fastify
-apps/web                 Vite shell with routing and TanStack Query
+apps/web                 Vite worklist with Tailwind, shadcn, and TanStack Query
 packages/config-biome
 packages/config-typescript   base, node, vite
 packages/contracts           Zod contracts shared by the API and the web app
