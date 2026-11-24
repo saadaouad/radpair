@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ZodError } from '@repo/schema-validation';
+import { ZodError } from '@repo/contracts';
 
 import { assertTestDatabaseIsolated, readEnvValue } from '@/databaseGuard.ts';
 import { envSchema, type Env } from '@/envSchema.ts';

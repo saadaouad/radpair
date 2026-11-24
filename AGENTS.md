@@ -70,7 +70,7 @@ Errors use one body:
 { "error": { "code": "validation_error", "message": "…", "details": {} } }
 ```
 
-Codes: `validation_error` (400), `payload_too_large` (413), `not_found` (404), `version_conflict` (409), `report_signed` (403), `database_unavailable` (503), `internal_error` (500). The body limit is 256 KB. Zod contracts live in `@repo/schema-validation`. The server walks a report document iteratively, with a depth cap of 12 and a node cap of 2000. Allowed nodes are `doc`, `paragraph`, `text`, `heading`, `bulletList`, `orderedList`, `listItem`, and `keyImage`. Marks are bold and italic. A key image must belong to that study. Caption max is 240 characters.
+Codes: `validation_error` (400), `payload_too_large` (413), `not_found` (404), `version_conflict` (409), `report_signed` (403), `database_unavailable` (503), `internal_error` (500). The body limit is 256 KB. Zod contracts live in `@repo/contracts`. The server walks a report document iteratively, with a depth cap of 12 and a node cap of 2000. Allowed nodes are `doc`, `paragraph`, `text`, `heading`, `bulletList`, `orderedList`, `listItem`, and `keyImage`. Marks are bold and italic. A key image must belong to that study. Caption max is 240 characters.
 
 Save and sign go through one update function. Routes do not update the row themselves.
 
@@ -78,16 +78,16 @@ Save and sign go through one update function. Routes do not update the row thems
 
 ```
 apps/api                 Fastify
-apps/web                 Vite, added in the frontend milestone
-packages/biome-config
-packages/typescript-config   base, node, vite
-packages/schema-validation   Zod contracts shared by the API and the web app
+apps/web                 Vite shell with routing and TanStack Query
+packages/config-biome
+packages/config-typescript   base, node, vite
+packages/contracts           Zod contracts shared by the API and the web app
 packages/vitest-config
 ```
 
 `@/` is a different folder in each app. In `apps/api` it is `apps/api/src`. In `apps/web` it is `apps/web/src`. Declare the alias in that app's `tsconfig.json`, and again in `tsup` or Vite, so the two apps never share one path. Shared packages stay `@repo/...`. Keep the `.ts` extension on API imports.
 
-`pnpm lint` runs Biome once over the repo. `pnpm check-types`, `pnpm test:unit`, and `pnpm test:integration` go through Turbo.
+`pnpm lint` runs Biome once over the repo. `pnpm typecheck`, `pnpm test`, and `pnpm test:integration` go through Turbo.
 
 ## Tests that protect the baseline
 

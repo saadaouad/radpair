@@ -1,5 +1,5 @@
-import type { ApiErrorBody, ApiErrorCode } from '@repo/schema-validation';
-import { ZodError } from '@repo/schema-validation';
+import type { ApiErrorBody, ApiErrorCode } from '@repo/contracts';
+import { ZodError } from '@repo/contracts';
 import type { FastifyInstance } from 'fastify';
 
 type HttpError = {

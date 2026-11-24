@@ -24,12 +24,12 @@ Put the dev project URL in `apps/api/.env` and the test project URL in `apps/api
 pnpm dev
 ```
 
-The API listens on port 3001. `GET http://localhost:3001/health` returns `status: ok` when Postgres answers.
+The web app listens on port 5173. The API listens on port 3001. `GET http://localhost:3001/health` returns `status: ok` when Postgres answers.
 
 ```bash
-pnpm check-types
+pnpm typecheck
 pnpm lint
-pnpm test:unit
+pnpm test
 pnpm test:integration
 ```
 

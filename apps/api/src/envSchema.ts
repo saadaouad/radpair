@@ -1,4 +1,4 @@
-import { z } from '@repo/schema-validation';
+import { z } from '@repo/contracts';
 
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

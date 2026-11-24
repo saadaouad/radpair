@@ -2,5 +2,27 @@
   "name": "web",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@repo/contracts": "workspace:*",
+    "@tanstack/react-query": "^5.90.12",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router": "^7.9.6"
+  },
+  "devDependencies": {
+    "@repo/config-typescript": "workspace:*",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "typescript": "5.9.2",
+    "vite": "^7.2.4"
+  }
 }

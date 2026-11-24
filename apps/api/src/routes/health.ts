@@ -1,4 +1,4 @@
-import { healthResponseSchema } from '@repo/schema-validation';
+import { healthResponseSchema } from '@repo/contracts';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 

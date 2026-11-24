@@ -1,4 +1,4 @@
-import { ZodError, z } from '@repo/schema-validation';
+import { ZodError, z } from '@repo/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { ApiError, toErrorBody } from '@/plugins/errorHandler.ts';

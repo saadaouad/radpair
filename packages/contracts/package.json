@@ -1,5 +1,5 @@
 {
-  "name": "@repo/schema-validation",
+  "name": "@repo/contracts",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
   },
@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
-    "@repo/typescript-config": "workspace:*",
+    "@repo/config-typescript": "workspace:*",
     "typescript": "5.9.2"
   }
 }

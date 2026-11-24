@@ -8,7 +8,7 @@
     ".": "./vitest.config.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "lint": "biome check ."
   },
   "dependencies": {
@@ -16,7 +16,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
-    "@repo/typescript-config": "workspace:*",
+    "@repo/config-typescript": "workspace:*",
     "@types/node": "^24.10.1",
     "typescript": "5.9.2"
   }

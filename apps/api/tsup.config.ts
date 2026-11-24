@@ -11,7 +11,7 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   splitting: false,
-  noExternal: ['@repo/schema-validation'],
+  noExternal: ['@repo/contracts'],
   esbuildOptions(options) {
     options.alias = {
       '@': src

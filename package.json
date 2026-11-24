@@ -9,13 +9,14 @@
     "lint:fix": "biome check --write .",
     "format": "biome format .",
     "format:fix": "biome format --write .",
-    "check-types": "turbo run check-types",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
     "test:unit": "turbo run test:unit",
     "test:integration": "turbo run test:integration"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
-    "@repo/biome-config": "workspace:*",
+    "@repo/config-biome": "workspace:*",
     "turbo": "^2.9.8",
     "typescript": "5.9.2"
   },
