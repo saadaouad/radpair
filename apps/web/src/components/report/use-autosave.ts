@@ -1,0 +1,269 @@
+import type { Editor } from '@tiptap/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useBlocker } from 'react-router';
+
+import { ReportSaveError, saveReport, type ReportConflict } from '@/lib/reports.ts';
+
+const saveDelayMs = 800;
+const retryDelayMs = 400;
+
+export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'failed' | 'conflict';
+
+const statusLabel: Record<SaveStatus, string> = {
+  saved: 'Saved',
+  unsaved: 'Unsaved',
+  saving: 'Saving',
+  failed: "Couldn't save",
+  conflict: 'Conflict'
+};
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const retryable = (error: unknown) => {
+  if (!(error instanceof ReportSaveError)) {
+    return true;
+  }
+  return error.status === 500 || error.status === 503;
+};
+
+export const useReportAutosave = ({
+  editor,
+  reportId,
+  initialVersion,
+  readOnly,
+  baseline
+}: {
+  editor: Editor | null;
+  reportId: string;
+  initialVersion: number;
+  readOnly: boolean;
+  baseline: { current: string | null };
+}) => {
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
+  const versionRef = useRef(initialVersion);
+  const statusRef = useRef<SaveStatus>('saved');
+  const inFlight = useRef(false);
+  const queued = useRef(false);
+  const timer = useRef<number | null>(null);
+  const suppress = useRef(false);
+  const flushingLeave = useRef(false);
+  const [status, setStatus] = useState<SaveStatus>('saved');
+  const [message, setMessage] = useState('');
+  const [conflict, setConflict] = useState<ReportConflict | null>(null);
+
+  const setSaveStatus = useCallback((next: SaveStatus) => {
+    statusRef.current = next;
+    setStatus(next);
+  }, []);
+
+  // baseline is a stable ref shared with the editor.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: baseline is a stable ref
+  const flush = useCallback(async () => {
+    const current = editorRef.current;
+    if (!current || readOnly || statusRef.current === 'conflict') {
+      return;
+    }
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+    const content = current.getJSON();
+    const serialized = JSON.stringify(content);
+    if (baseline.current !== null && serialized === baseline.current) {
+      if (!inFlight.current) {
+        setSaveStatus('saved');
+      }
+      return;
+    }
+    if (inFlight.current) {
+      queued.current = true;
+      return;
+    }
+
+    inFlight.current = true;
+    setSaveStatus('saving');
+    setMessage('');
+    try {
+      let saved: Awaited<ReturnType<typeof saveReport>> | null = null;
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          saved = await saveReport(reportId, content, versionRef.current);
+          break;
+        } catch (error) {
+          lastError = error;
+          if (attempt === 0 && retryable(error)) {
+            await wait(retryDelayMs);
+            continue;
+          }
+          throw error;
+        }
+      }
+      if (!saved) {
+        throw lastError;
+      }
+      versionRef.current = saved.version;
+      baseline.current = serialized;
+      const latest = editorRef.current ? JSON.stringify(editorRef.current.getJSON()) : serialized;
+      if (latest === serialized) {
+        setSaveStatus('saved');
+      } else {
+        setSaveStatus('unsaved');
+        queued.current = true;
+      }
+    } catch (error) {
+      queued.current = false;
+      if (error instanceof ReportSaveError && error.status === 409 && error.conflict) {
+        setConflict(error.conflict);
+        setSaveStatus('conflict');
+        setMessage(error.message);
+      } else {
+        setSaveStatus('failed');
+        setMessage(error instanceof Error ? error.message : 'The report could not be saved.');
+      }
+    } finally {
+      inFlight.current = false;
+      if (queued.current) {
+        queued.current = false;
+        void flush();
+      }
+    }
+  }, [readOnly, reportId, setSaveStatus]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: baseline is a stable ref
+  const schedule = useCallback(() => {
+    const current = editorRef.current;
+    if (!current || readOnly || suppress.current || statusRef.current === 'conflict') {
+      return;
+    }
+    const serialized = JSON.stringify(current.getJSON());
+    if (baseline.current !== null && serialized === baseline.current) {
+      if (timer.current !== null) {
+        window.clearTimeout(timer.current);
+        timer.current = null;
+      }
+      if (!inFlight.current && statusRef.current !== 'saving') {
+        setSaveStatus('saved');
+      }
+      return;
+    }
+    setSaveStatus(statusRef.current === 'saving' ? 'saving' : 'unsaved');
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current);
+    }
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      void flush();
+    }, saveDelayMs);
+  }, [flush, readOnly, setSaveStatus]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: baseline is a stable ref
+  const loadLatest = useCallback(() => {
+    const current = editorRef.current;
+    if (!current || !conflict) {
+      return;
+    }
+    suppress.current = true;
+    current.commands.setContent(conflict.content);
+    baseline.current = JSON.stringify(current.getJSON());
+    versionRef.current = conflict.version;
+    suppress.current = false;
+    setConflict(null);
+    setMessage('');
+    setSaveStatus('saved');
+  }, [conflict, setSaveStatus]);
+
+  const overwrite = useCallback(() => {
+    if (!conflict) {
+      return;
+    }
+    versionRef.current = conflict.version;
+    setConflict(null);
+    setMessage('');
+    setSaveStatus('unsaved');
+    void flush();
+  }, [conflict, flush, setSaveStatus]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: baseline is a stable ref
+  useEffect(() => {
+    const onHide = () => {
+      const current = editorRef.current;
+      if (!current || readOnly || inFlight.current || statusRef.current === 'conflict') {
+        return;
+      }
+      const content = current.getJSON();
+      const serialized = JSON.stringify(content);
+      if (baseline.current !== null && serialized === baseline.current) {
+        return;
+      }
+      if (serialized.length > 60_000) {
+        return;
+      }
+      void saveReport(reportId, content, versionRef.current, { keepalive: true }).catch(() => {
+        setSaveStatus('failed');
+      });
+    };
+    const onLeave = (event: BeforeUnloadEvent) => {
+      if (statusRef.current === 'failed' || statusRef.current === 'conflict') {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener('pagehide', onHide);
+    window.addEventListener('beforeunload', onLeave);
+    return () => {
+      window.removeEventListener('pagehide', onHide);
+      window.removeEventListener('beforeunload', onLeave);
+      if (timer.current !== null) {
+        window.clearTimeout(timer.current);
+      }
+    };
+  }, [readOnly, reportId, setSaveStatus]);
+
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (readOnly || currentLocation.pathname === nextLocation.pathname) {
+      return false;
+    }
+    const current = statusRef.current;
+    return (
+      current === 'unsaved' ||
+      current === 'saving' ||
+      current === 'failed' ||
+      current === 'conflict'
+    );
+  });
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') {
+      flushingLeave.current = false;
+      return;
+    }
+    if (statusRef.current === 'failed' || statusRef.current === 'conflict') {
+      return;
+    }
+    if (flushingLeave.current) {
+      return;
+    }
+    flushingLeave.current = true;
+    void flush().then(() => {
+      if (statusRef.current === 'failed' || statusRef.current === 'conflict') {
+        return;
+      }
+      if (blocker.state === 'blocked') {
+        blocker.proceed();
+      }
+    });
+  }, [blocker, flush]);
+
+  return {
+    status,
+    label: statusLabel[status],
+    message,
+    conflict,
+    flush,
+    schedule,
+    loadLatest,
+    overwrite,
+    blocker
+  };
+};

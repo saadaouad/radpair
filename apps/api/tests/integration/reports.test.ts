@@ -117,6 +117,40 @@ describe('report API', () => {
     ).toEqual([1, 2]);
   });
 
+  it('keeps one document when two saves use the same version', async () => {
+    const left = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Left tab.' }] }]
+    };
+    const right = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Right tab.' }] }]
+    };
+    const [first, second] = await Promise.all([
+      app.inject({
+        method: 'PUT',
+        url: `/api/reports/${reportId('01')}`,
+        payload: { content: left, expectedVersion: 1 }
+      }),
+      app.inject({
+        method: 'PUT',
+        url: `/api/reports/${reportId('01')}`,
+        payload: { content: right, expectedVersion: 1 }
+      })
+    ]);
+
+    const codes = [first.statusCode, second.statusCode].sort();
+    expect(codes).toEqual([200, 409]);
+    expect(
+      [first.json(), second.json()].some((body) => body.error?.code === 'version_conflict')
+    ).toBe(true);
+
+    const winner = first.statusCode === 200 ? left : right;
+    const stored = await app.inject({ method: 'GET', url: `/api/reports/${reportId('01')}` });
+    expect(stored.json().version).toBe(2);
+    expect(stored.json().content).toMatchObject(winner);
+  });
+
   it('rejects a key image from another study and a nested document', async () => {
     const foreignImage = await app.inject({
       method: 'PUT',

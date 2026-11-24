@@ -7,8 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Filmstrip } from '@/components/report/filmstrip.tsx';
 import { ImageDialog } from '@/components/report/image-dialog.tsx';
 import { imageIdsInDocument, KeyImage } from '@/components/report/key-image.ts';
+import { useReportAutosave } from '@/components/report/use-autosave.ts';
 import { Button } from '@/components/ui/button.tsx';
-import { saveReport } from '@/lib/reports.ts';
 
 const formats = [
   {
@@ -43,8 +43,6 @@ const formats = [
   }
 ] as const;
 
-type SaveState = 'idle' | 'saving' | 'saved' | 'error';
-
 export const ReportWorkspace = ({
   report,
   images,
@@ -54,15 +52,15 @@ export const ReportWorkspace = ({
   images: StudyImageResponse[];
   readOnly: boolean;
 }) => {
-  const [version, setVersion] = useState(report.version);
-  const [dirty, setDirty] = useState(false);
-  const [saveState, setSaveState] = useState<SaveState>('idle');
-  const [saveMessage, setSaveMessage] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(images[0]?.id ?? null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [placedIds, setPlacedIds] = useState<string[]>([]);
   const [notice, setNotice] = useState('');
   const baseline = useRef<string | null>(null);
+  const autosaveHandlers = useRef({
+    schedule: () => {},
+    flush: async () => {}
+  });
   const extensions = useMemo(
     () => [
       StarterKit.configure({
@@ -71,6 +69,7 @@ export const ReportWorkspace = ({
         codeBlock: false,
         hardBreak: false,
         horizontalRule: false,
+        trailingNode: false,
         link: false,
         strike: false,
         underline: false,
@@ -97,13 +96,26 @@ export const ReportWorkspace = ({
       setPlacedIds(imageIdsInDocument(current.state.doc));
     },
     onUpdate: ({ editor: current }) => {
-      const next = JSON.stringify(current.getJSON());
       setPlacedIds(imageIdsInDocument(current.state.doc));
-      setDirty(next !== baseline.current);
       setNotice('');
-      setSaveState((state) => (state === 'saving' ? state : 'idle'));
+      autosaveHandlers.current.schedule();
+    },
+    onBlur: () => {
+      void autosaveHandlers.current.flush();
     }
   });
+
+  const autosave = useReportAutosave({
+    editor,
+    reportId: report.id,
+    initialVersion: report.version,
+    readOnly,
+    baseline
+  });
+  autosaveHandlers.current = {
+    schedule: autosave.schedule,
+    flush: autosave.flush
+  };
 
   const active = useEditorState({
     editor,
@@ -155,25 +167,6 @@ export const ReportWorkspace = ({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [insertSelected]);
 
-  const save = async () => {
-    if (!editor || readOnly || !dirty || saveState === 'saving') {
-      return;
-    }
-    setSaveState('saving');
-    setSaveMessage('');
-    try {
-      const saved = await saveReport(report.id, editor.getJSON(), version);
-      baseline.current = JSON.stringify(editor.getJSON());
-      setVersion(saved.version);
-      setDirty(false);
-      setSaveState('saved');
-      setSaveMessage('Saved.');
-    } catch (error) {
-      setSaveState('error');
-      setSaveMessage(error instanceof Error ? error.message : 'The report could not be saved.');
-    }
-  };
-
   const expanded = images.find((image) => image.id === expandedId) ?? null;
   const selectedIsPlaced = selectedId !== null && placedIds.includes(selectedId);
   const pressed = {
@@ -197,19 +190,39 @@ export const ReportWorkspace = ({
         <div className="min-w-0 space-y-3">
           <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 py-3 backdrop-blur lg:static lg:z-auto lg:border-0 lg:bg-transparent lg:p-0">
             <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 lg:mx-0 lg:max-w-none">
-              <p aria-live="polite" className="text-sm text-muted-foreground">
-                {readOnly ? 'This report is signed and can no longer be changed.' : null}
-                {!readOnly && saveState === 'saving' ? 'Saving.' : null}
-                {!readOnly && saveState === 'saved' ? saveMessage : null}
-                {!readOnly && saveState === 'error' ? saveMessage : null}
-                {!readOnly && saveState === 'idle' && dirty ? 'Unsaved changes.' : null}
-              </p>
+              <div className="min-w-0 space-y-2">
+                <p aria-live="polite" className="text-sm text-muted-foreground">
+                  {readOnly
+                    ? 'This report is signed and can no longer be changed.'
+                    : autosave.label}
+                  {!readOnly && autosave.status === 'failed' ? `. ${autosave.message}` : null}
+                </p>
+                {!readOnly && autosave.status === 'conflict' ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm">
+                      This report was updated somewhere else. Your text is still in the editor, so
+                      you can copy it before loading the other version.
+                    </p>
+                    <Button onClick={autosave.loadLatest} size="sm" type="button" variant="outline">
+                      Load latest
+                    </Button>
+                    <Button onClick={autosave.overwrite} size="sm" type="button">
+                      Overwrite with mine
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
               <Button
-                disabled={readOnly || !dirty || saveState === 'saving'}
-                onClick={() => void save()}
+                disabled={
+                  readOnly ||
+                  autosave.status === 'saved' ||
+                  autosave.status === 'saving' ||
+                  autosave.status === 'conflict'
+                }
+                onClick={() => void autosave.flush()}
                 type="button"
               >
-                {saveState === 'saving' ? 'Saving' : 'Save'}
+                Save
               </Button>
             </div>
           </div>
@@ -255,6 +268,32 @@ export const ReportWorkspace = ({
         </div>
       </div>
       <ImageDialog image={expanded} onClose={() => setExpandedId(null)} />
+      {autosave.blocker.state === 'blocked' &&
+      (autosave.status === 'failed' || autosave.status === 'conflict') ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div
+            aria-labelledby="unsaved-title"
+            aria-modal="true"
+            className="w-full max-w-md space-y-3 rounded-xl bg-background p-4 shadow-lg"
+            role="alertdialog"
+          >
+            <h2 className="text-lg font-semibold" id="unsaved-title">
+              This report hasn't been saved
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Your text stays in the editor if you stay on this page.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button onClick={() => autosave.blocker.reset?.()} type="button" variant="outline">
+                Stay
+              </Button>
+              <Button onClick={() => autosave.blocker.proceed?.()} type="button">
+                Leave
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };
