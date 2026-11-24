@@ -221,6 +221,14 @@ describe('report API', () => {
     });
     expect(saved.statusCode).toBe(200);
 
+    const stale = await app.inject({
+      method: 'POST',
+      url: `/api/reports/${reportId('03')}/sign`,
+      payload: { expectedVersion: 1 }
+    });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json().error.code).toBe('version_conflict');
+
     const signed = await app.inject({
       method: 'POST',
       url: `/api/reports/${reportId('03')}/sign`,
@@ -228,11 +236,18 @@ describe('report API', () => {
     });
     expect(signed.statusCode).toBe(200);
     expect(signed.json()).toMatchObject({ status: 'signed', version: 3 });
+    expect(signed.json().signedAt).toEqual(expect.any(String));
 
     const change = await app.inject({
       method: 'PUT',
       url: `/api/reports/${reportId('03')}`,
-      payload: { content: findings, expectedVersion: 3 }
+      payload: {
+        content: {
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Changed after sign.' }] }]
+        },
+        expectedVersion: 3
+      }
     });
     expect(change.statusCode).toBe(403);
     expect(change.json().error.code).toBe('report_signed');
@@ -245,7 +260,25 @@ describe('report API', () => {
     expect(again.statusCode).toBe(403);
 
     const stored = await app.inject({ method: 'GET', url: `/api/reports/${reportId('03')}` });
-    expect(stored.json()).toMatchObject({ status: 'signed', version: 3 });
+    expect(stored.json()).toMatchObject({
+      status: 'signed',
+      version: 3,
+      signedAt: signed.json().signedAt,
+      content: findings
+    });
+
+    const history = await app.inject({
+      method: 'GET',
+      url: `/api/reports/${reportId('03')}/history`
+    });
+    expect(history.statusCode).toBe(200);
+    expect(history.json().revisions.at(-1)).toMatchObject({ version: 3, content: findings });
+
+    const list = await app.inject({ method: 'GET', url: '/api/studies' });
+    const study = (list.json().studies as Array<{ reportId: string; status: string }>).find(
+      (item) => item.reportId === reportId('03')
+    );
+    expect(study?.status).toBe('signed');
   });
 
   it('returns not found for a missing study', async () => {

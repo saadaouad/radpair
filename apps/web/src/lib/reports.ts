@@ -55,6 +55,26 @@ export const fetchStudyReport = async (studyId: string): Promise<ReportResponse>
   return reportSchema.parse(await response.json());
 };
 
+const throwForFailedReport = async (response: Response, fallback: string): Promise<never> => {
+  let message = fallback;
+  let code: string | null = null;
+  let conflict: ReportConflict | null = null;
+  try {
+    const parsed = apiErrorSchema.safeParse(await response.json());
+    if (parsed.success) {
+      message = parsed.data.error.message;
+      code = parsed.data.error.code;
+      const details = conflictSchema.safeParse(parsed.data.error.details);
+      if (details.success) {
+        conflict = details.data;
+      }
+    }
+  } catch {
+    message = fallback;
+  }
+  throw new ReportSaveError(message, response.status, code, conflict);
+};
+
 export const saveReport = async (
   reportId: string,
   content: unknown,
@@ -69,23 +89,24 @@ export const saveReport = async (
   });
 
   if (!response.ok) {
-    let message = 'The report could not be saved.';
-    let code: string | null = null;
-    let conflict: ReportConflict | null = null;
-    try {
-      const parsed = apiErrorSchema.safeParse(await response.json());
-      if (parsed.success) {
-        message = parsed.data.error.message;
-        code = parsed.data.error.code;
-        const details = conflictSchema.safeParse(parsed.data.error.details);
-        if (details.success) {
-          conflict = details.data;
-        }
-      }
-    } catch {
-      message = 'The report could not be saved.';
-    }
-    throw new ReportSaveError(message, response.status, code, conflict);
+    await throwForFailedReport(response, 'The report could not be saved.');
+  }
+
+  return reportSchema.parse(await response.json());
+};
+
+export const signReport = async (
+  reportId: string,
+  expectedVersion: number
+): Promise<ReportResponse> => {
+  const response = await fetch(`${apiUrl}/api/reports/${reportId}/sign`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ expectedVersion })
+  });
+
+  if (!response.ok) {
+    await throwForFailedReport(response, 'The report could not be signed.');
   }
 
   return reportSchema.parse(await response.json());

@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import type { ReportResponse, StudyResponse } from '@repo/contracts';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router';
 
 import { ReportWorkspace } from '@/components/report/editor.tsx';
@@ -10,6 +11,7 @@ import { fetchStudy } from '@/lib/studies.ts';
 
 export const StudyPage = () => {
   const { id = '' } = useParams();
+  const queryClient = useQueryClient();
   const [params] = useSearchParams();
   const search = params.toString();
   const worklistHref = search.length > 0 ? `/?${search}` : '/';
@@ -79,6 +81,7 @@ export const StudyPage = () => {
             <ReportWorkspace
               images={images.data}
               key={report.data.id}
+              onSigned={(signed) => applySignedReport(queryClient, signed)}
               readOnly={report.data.status === 'signed'}
               report={report.data}
             />
@@ -88,5 +91,18 @@ export const StudyPage = () => {
         </div>
       ) : null}
     </section>
+  );
+};
+
+const applySignedReport = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  signed: ReportResponse
+) => {
+  queryClient.setQueryData(['study-report', signed.studyId], signed);
+  queryClient.setQueryData<StudyResponse>(['study', signed.studyId], (current) =>
+    current ? { ...current, status: 'signed' } : current
+  );
+  queryClient.setQueryData<StudyResponse[]>(['studies'], (current) =>
+    current?.map((study) => (study.id === signed.studyId ? { ...study, status: 'signed' } : study))
   );
 };

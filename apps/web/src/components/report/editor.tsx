@@ -1,4 +1,10 @@
-import type { ReportResponse, StudyImageResponse } from '@repo/contracts';
+import {
+  hasReportSubstance,
+  parseReportDocument,
+  ReportDocumentError,
+  type ReportResponse,
+  type StudyImageResponse
+} from '@repo/contracts';
 import type { Content } from '@tiptap/react';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
@@ -7,8 +13,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Filmstrip } from '@/components/report/filmstrip.tsx';
 import { ImageDialog } from '@/components/report/image-dialog.tsx';
 import { imageIdsInDocument, KeyImage } from '@/components/report/key-image.ts';
+import { SignDialog } from '@/components/report/sign-dialog.tsx';
 import { useReportAutosave } from '@/components/report/use-autosave.ts';
 import { Button } from '@/components/ui/button.tsx';
+import { ReportSaveError, fetchStudyReport, signReport } from '@/lib/reports.ts';
 
 const formats = [
   {
@@ -46,16 +54,21 @@ const formats = [
 export const ReportWorkspace = ({
   report,
   images,
-  readOnly
+  readOnly,
+  onSigned
 }: {
   report: ReportResponse;
   images: StudyImageResponse[];
   readOnly: boolean;
+  onSigned: (report: ReportResponse) => void;
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(images[0]?.id ?? null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [placedIds, setPlacedIds] = useState<string[]>([]);
   const [notice, setNotice] = useState('');
+  const [signOpen, setSignOpen] = useState(false);
+  const [signing, setSigning] = useState(false);
+  const [signMessage, setSignMessage] = useState('');
   const baseline = useRef<string | null>(null);
   const autosaveHandlers = useRef({
     schedule: () => {},
@@ -117,6 +130,10 @@ export const ReportWorkspace = ({
     flush: autosave.flush
   };
 
+  useEffect(() => {
+    editor?.setEditable(!readOnly);
+  }, [editor, readOnly]);
+
   const active = useEditorState({
     editor,
     selector: ({ editor: current }) => {
@@ -167,6 +184,66 @@ export const ReportWorkspace = ({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [insertSelected]);
 
+  const confirmSign = async () => {
+    if (!editor || readOnly || signing) {
+      return;
+    }
+    setSigning(true);
+    setSignMessage('');
+    try {
+      const settled = await autosave.settle();
+      if (settled.status === 'conflict') {
+        setSignMessage('This report was updated somewhere else. Resolve that before signing.');
+        return;
+      }
+      if (settled.status === 'failed') {
+        setSignMessage(settled.message || 'The report could not be saved.');
+        return;
+      }
+      if (settled.status !== 'saved') {
+        setSignMessage('Save the report before signing.');
+        return;
+      }
+
+      let substance = false;
+      try {
+        substance = hasReportSubstance(parseReportDocument(editor.getJSON()));
+      } catch (error) {
+        setSignMessage(
+          error instanceof ReportDocumentError ? error.message : 'This report cannot be signed.'
+        );
+        return;
+      }
+      if (!substance) {
+        setSignMessage('A report needs text or a key image before it can be signed.');
+        return;
+      }
+
+      const signed = await signReport(report.id, autosave.version());
+      autosave.adopt(signed.version, JSON.stringify(editor.getJSON()));
+      onSigned(signed);
+      setSignOpen(false);
+    } catch (error) {
+      if (error instanceof ReportSaveError && error.status === 409 && error.conflict) {
+        autosave.noteConflict(error.conflict);
+        setSignOpen(false);
+        return;
+      }
+      if (error instanceof ReportSaveError && error.status === 403) {
+        const latest = await fetchStudyReport(report.studyId);
+        if (latest.status === 'signed') {
+          autosave.replaceDocument(latest.content, latest.version);
+          onSigned(latest);
+          setSignOpen(false);
+          return;
+        }
+      }
+      setSignMessage(error instanceof Error ? error.message : 'The report could not be signed.');
+    } finally {
+      setSigning(false);
+    }
+  };
+
   const expanded = images.find((image) => image.id === expandedId) ?? null;
   const selectedIsPlaced = selectedId !== null && placedIds.includes(selectedId);
   const pressed = {
@@ -212,18 +289,32 @@ export const ReportWorkspace = ({
                   </div>
                 ) : null}
               </div>
-              <Button
-                disabled={
-                  readOnly ||
-                  autosave.status === 'saved' ||
-                  autosave.status === 'saving' ||
-                  autosave.status === 'conflict'
-                }
-                onClick={() => void autosave.flush()}
-                type="button"
-              >
-                Save
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  disabled={
+                    readOnly ||
+                    autosave.status === 'saved' ||
+                    autosave.status === 'saving' ||
+                    autosave.status === 'conflict'
+                  }
+                  onClick={() => void autosave.flush()}
+                  type="button"
+                  variant="outline"
+                >
+                  Save
+                </Button>
+                {readOnly ? null : (
+                  <Button
+                    onClick={() => {
+                      setSignMessage('');
+                      setSignOpen(true);
+                    }}
+                    type="button"
+                  >
+                    Sign
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
           <div className="overflow-hidden rounded-xl border bg-card">
@@ -268,6 +359,13 @@ export const ReportWorkspace = ({
         </div>
       </div>
       <ImageDialog image={expanded} onClose={() => setExpandedId(null)} />
+      <SignDialog
+        message={signMessage}
+        onCancel={() => setSignOpen(false)}
+        onConfirm={() => void confirmSign()}
+        open={signOpen}
+        pending={signing}
+      />
       {autosave.blocker.state === 'blocked' &&
       (autosave.status === 'failed' || autosave.status === 'conflict') ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

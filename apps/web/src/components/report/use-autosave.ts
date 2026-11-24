@@ -49,7 +49,12 @@ export const useReportAutosave = ({
   const suppress = useRef(false);
   const flushingLeave = useRef(false);
   const [status, setStatus] = useState<SaveStatus>('saved');
-  const [message, setMessage] = useState('');
+  const [message, setMessageState] = useState('');
+  const messageRef = useRef('');
+  const setMessage = useCallback((next: string) => {
+    messageRef.current = next;
+    setMessageState(next);
+  }, []);
   const [conflict, setConflict] = useState<ReportConflict | null>(null);
 
   const setSaveStatus = useCallback((next: SaveStatus) => {
@@ -172,7 +177,7 @@ export const useReportAutosave = ({
     setConflict(null);
     setMessage('');
     setSaveStatus('saved');
-  }, [conflict, setSaveStatus]);
+  }, [conflict, setMessage, setSaveStatus]);
 
   const overwrite = useCallback(() => {
     if (!conflict) {
@@ -183,7 +188,69 @@ export const useReportAutosave = ({
     setMessage('');
     setSaveStatus('unsaved');
     void flush();
-  }, [conflict, flush, setSaveStatus]);
+  }, [conflict, flush, setMessage, setSaveStatus]);
+
+  const settle = useCallback(async () => {
+    await flush();
+    while (inFlight.current || statusRef.current === 'saving') {
+      await wait(40);
+    }
+    return { status: statusRef.current, message: messageRef.current };
+  }, [flush]);
+
+  const version = useCallback(() => versionRef.current, []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: baseline is a stable ref
+  const adopt = useCallback(
+    (nextVersion: number, serialized: string) => {
+      if (timer.current !== null) {
+        window.clearTimeout(timer.current);
+        timer.current = null;
+      }
+      versionRef.current = nextVersion;
+      baseline.current = serialized;
+      setConflict(null);
+      setMessage('');
+      setSaveStatus('saved');
+    },
+    [setSaveStatus]
+  );
+
+  const noteConflict = useCallback(
+    (next: ReportConflict) => {
+      if (timer.current !== null) {
+        window.clearTimeout(timer.current);
+        timer.current = null;
+      }
+      setConflict(next);
+      setMessage('This report was updated somewhere else.');
+      setSaveStatus('conflict');
+    },
+    [setMessage, setSaveStatus]
+  );
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: baseline is a stable ref
+  const replaceDocument = useCallback(
+    (content: ReportConflict['content'], nextVersion: number) => {
+      const current = editorRef.current;
+      if (!current) {
+        return;
+      }
+      if (timer.current !== null) {
+        window.clearTimeout(timer.current);
+        timer.current = null;
+      }
+      suppress.current = true;
+      current.commands.setContent(content);
+      baseline.current = JSON.stringify(current.getJSON());
+      versionRef.current = nextVersion;
+      suppress.current = false;
+      setConflict(null);
+      setMessage('');
+      setSaveStatus('saved');
+    },
+    [setSaveStatus]
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: baseline is a stable ref
   useEffect(() => {
@@ -261,6 +328,11 @@ export const useReportAutosave = ({
     message,
     conflict,
     flush,
+    settle,
+    version,
+    adopt,
+    noteConflict,
+    replaceDocument,
     schedule,
     loadLatest,
     overwrite,
