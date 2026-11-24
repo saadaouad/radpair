@@ -9,7 +9,7 @@ describe('envSchema', () => {
     const env = envSchema.parse({ DATABASE_URL: databaseUrl });
 
     expect(env.NODE_ENV).toBe('development');
-    expect(env.APP_STAGE).toBe('dev');
+    expect(env.APP_ENV).toBe('dev');
     expect(env.PORT).toBe(3001);
     expect(env.DATABASE_POOL_MAX).toBe(3);
     expect(env.CORS_ORIGIN).toEqual(['http://localhost:5173']);

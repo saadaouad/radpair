@@ -2,7 +2,7 @@ import { z } from '@repo/contracts';
 
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  APP_STAGE: z.enum(['dev', 'test', 'prod']).default('dev'),
+  APP_ENV: z.enum(['dev', 'test', 'prod']).default('dev'),
   HOST: z.string().min(1).default('0.0.0.0'),
   PORT: z.coerce.number().int().positive().default(3001),
   DATABASE_URL: z

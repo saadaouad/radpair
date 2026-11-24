@@ -8,8 +8,8 @@ import { envSchema, type Env } from '@/envSchema.ts';
 
 const apiRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-const inferStage = () => {
-  const explicit = process.env.APP_STAGE;
+const inferEnv = () => {
+  const explicit = process.env.APP_ENV ?? process.env.APP_STAGE;
   if (explicit === 'dev' || explicit === 'test' || explicit === 'prod') {
     return explicit;
   }
@@ -33,10 +33,10 @@ const failStartup = (message: string): never => {
   process.exit(1);
 };
 
-const stage = inferStage();
-process.env.APP_STAGE = stage;
+const appEnv = inferEnv();
+process.env.APP_ENV = appEnv;
 
-const envFileName = stage === 'test' ? '.env.test' : stage === 'dev' ? '.env' : undefined;
+const envFileName = appEnv === 'test' ? '.env.test' : appEnv === 'dev' ? '.env' : undefined;
 
 if (envFileName) {
   const envFile = resolve(apiRoot, envFileName);
@@ -63,7 +63,7 @@ try {
   throw error;
 }
 
-if (env.APP_STAGE === 'test') {
+if (env.APP_ENV === 'test') {
   const devUrl = readEnvValue(resolve(apiRoot, '.env'), 'DATABASE_URL');
   try {
     assertTestDatabaseIsolated(env.DATABASE_URL, devUrl);
@@ -74,6 +74,6 @@ if (env.APP_STAGE === 'test') {
 }
 
 export { env };
-export const isDev = () => env.APP_STAGE === 'dev';
-export const isTest = () => env.APP_STAGE === 'test';
-export const isProd = () => env.APP_STAGE === 'prod';
+export const isDev = () => env.APP_ENV === 'dev';
+export const isTest = () => env.APP_ENV === 'test';
+export const isProd = () => env.APP_ENV === 'prod';
