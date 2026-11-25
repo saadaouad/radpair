@@ -20,7 +20,7 @@ export const envSchema = z.object({
     .transform((value) =>
       value
         .split(',')
-        .map((origin) => origin.trim())
+        .map((origin) => origin.trim().replace(/\/+$/, ''))
         .filter((origin) => origin.length > 0)
     ),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info')
