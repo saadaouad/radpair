@@ -3,6 +3,7 @@
   "installCommand": "cd \"$(git rev-parse --show-toplevel)\" && pnpm install --frozen-lockfile",
   "buildCommand": "cd \"$(git rev-parse --show-toplevel)\" && pnpm --filter api build",
   "framework": null,
+  "outputDirectory": "public",
   "functions": {
     "api/index.ts": {
       "includeFiles": "dist/**"
