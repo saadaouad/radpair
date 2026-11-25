@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from '@/app.tsx';
+import { ErrorBoundary } from '@/components/error-boundary.tsx';
 import '@/index.css';
 
 const root = document.getElementById('root');
@@ -12,6 +13,8 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary message="The workspace could not be shown.">
+      <App />
+    </ErrorBoundary>
   </StrictMode>
 );

@@ -1,9 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
-import { createBrowserRouter, NavLink, Outlet, RouterProvider } from 'react-router';
+import { useState, type ReactNode } from 'react';
+import { createBrowserRouter, NavLink, Outlet, RouterProvider, useLocation } from 'react-router';
 
+import { ErrorBoundary, NotFound, RouteError } from '@/components/error-boundary.tsx';
 import { StudyPage } from '@/pages/study-page.tsx';
 import { WorklistPage } from '@/pages/worklist-page.tsx';
+
+const PageBoundary = ({ children }: { children: ReactNode }) => {
+  const { pathname } = useLocation();
+  return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>;
+};
 
 const WorkspaceShell = () => {
   return (
@@ -26,9 +32,25 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: <WorkspaceShell />,
+    errorElement: <RouteError />,
     children: [
-      { index: true, element: <WorklistPage /> },
-      { path: 'studies/:id', element: <StudyPage /> }
+      {
+        index: true,
+        element: (
+          <PageBoundary>
+            <WorklistPage />
+          </PageBoundary>
+        )
+      },
+      {
+        path: 'studies/:id',
+        element: (
+          <PageBoundary>
+            <StudyPage />
+          </PageBoundary>
+        )
+      },
+      { path: '*', element: <NotFound /> }
     ]
   }
 ]);
