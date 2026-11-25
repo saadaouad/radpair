@@ -29,12 +29,20 @@ pnpm test:integration
 
 ## Decisions
 
-**Placing and moving a key image.** Drag a filmstrip image into the report and it lands in the gap under the pointer. The same image can appear once. Click a thumbnail to open it large, then Insert image places it at the cursor. Cmd+Shift+K (Ctrl+Shift+K) does the same for the selected thumbnail. Inside the report, drag the thumbnail, or use Up and Down, to move that block. Remove deletes it. The caption is edited on the block. The document stores the image id, and the study payload supplies the URL, so the editor cannot point a key image at an arbitrary address.
+**Placing and moving a key image.** Drag a filmstrip image into the report and it lands in the gap under the pointer. The same image can appear once. Click a thumbnail to open it, then Insert image, or press Cmd+Shift+K (Ctrl+Shift+K), to place the selected image at the cursor. Drag the thumbnail inside the report, or use Up and Down, to move the block. Remove deletes it. The caption is edited on the block. The document stores the image id and the study payload supplies the URL, so the editor cannot point a key image at an arbitrary address.
 
-**Two tabs.** Each save sends the version the editor loaded. The server writes only when that version still matches and the report is not signed. A stale save returns 409 with the current document. The editor keeps the local text and offers Load latest or Overwrite with mine. A conflict is never retried on its own, so one tab cannot replace the other quietly.
+**Two tabs.** A save sends the version the editor loaded. The server writes only when that version still matches and the report is not signed. A stale save returns 409 with the current document. The editor keeps the local text and offers Load latest or Overwrite with mine. A conflict is never retried on its own.
 
-**Text deleted around a key image.** A key image is its own block, between the paragraphs. Clearing or deleting a neighboring paragraph leaves the image where it is. Backspace or Delete at the edge of that text selects the image. The image goes away when that selected block is deleted, or when Remove is used.
+**Text deleted around a key image.** A key image is its own block. Deleting a neighboring paragraph leaves it in place. Backspace or Delete at the edge of that text selects the image. The image is removed only when that selected block is deleted, or when Remove is used.
 
-**Narrow windows.** From 1024px up, the worklist is a table and the images sit in a vertical filmstrip beside the editor. Below that, the worklist is cards, the filmstrip scrolls sideways, and the save state and Sign stay in a bar pinned to the bottom. The large image is a dialog at both widths.
+**Narrow windows.** From 1024px up, the worklist is a table and the filmstrip sits beside the editor. Below that, the worklist is cards, the filmstrip scrolls sideways, and the save state and Sign stay in a bar pinned to the bottom. The large image is a dialog at both widths.
 
-**API and data.** Studies, images, and one report per study live in Postgres. The report body is the editor document as JSON. A key image is a block in that JSON: `{ "type": "keyImage", "attrs": { "imageId", "caption" } }`. Each successful save stores a revision of the same JSON and increments an integer version. The first save moves a report from unread to draft. Sign sets signed and `signed_at`, and later writes are refused. Routes: `GET /health`, `GET /api/studies`, `GET /api/studies/:id`, `GET /api/studies/:id/images`, `GET /api/studies/:id/report`, `GET /api/reports/:id`, `PUT /api/reports/:id`, `POST /api/reports/:id/sign`, `GET /api/reports/:id/history`. A save sends `{ content, expectedVersion }`. Errors use `{ error: { code, message, details } }`.
+**API and data.** Studies, images, and one report per study live in Postgres. The report body is the editor JSON, and a key image is `{ "type": "keyImage", "attrs": { "imageId", "caption" } }`. Each save stores a revision of that JSON and increments an integer version. The first save moves unread to draft. Sign sets signed and `signed_at`, and later writes are refused. A save sends `{ content, expectedVersion }`. Errors use `{ error: { code, message, details } }`.
+
+## Left out
+
+No login, roles, DICOM, object storage, dictation, or a generated impression. The optional laterality warning is not built, and the app is not deployed. With another day I would deploy the API and the web app, run lint, typecheck, and tests in CI, then add that warning: if the report names a side that disagrees with the study description, show it and still allow signing. No model.
+
+## Agents
+
+I kept the brief as the source of truth and let an agent implement one milestone at a time, after the previous one had been reviewed. I checked the result with Biome, TypeScript, the unit and integration tests, and the running app in the browser. One correction: the editor deleted a key image when Backspace was pressed at the edge of the neighboring paragraph. That was wrong. The first keystroke now selects the image, and the image is removed only when that selected block is deleted.
