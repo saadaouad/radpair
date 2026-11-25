@@ -1,7 +1,20 @@
-export const localDatabaseUrl = 'postgresql://owner:secret@localhost:5432/radpair';
+const databaseUrl = process.env.DATABASE_URL;
 
-export const devDatabaseUrl =
-  'postgresql://owner:secret@ep-dev.eu-central-1.aws.neon.tech/neondb?sslmode=require';
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is not set');
+}
 
-export const testDatabaseUrl =
-  'postgresql://owner:secret@ep-test.eu-central-1.aws.neon.tech/neondb?sslmode=require';
+const withHost = (hostname: string, port?: string) => {
+  const url = new URL(databaseUrl);
+  url.hostname = hostname;
+  if (port) {
+    url.port = port;
+  }
+  return url.toString();
+};
+
+export const devDatabaseUrl = databaseUrl;
+
+export const testDatabaseUrl = withHost(`test.${new URL(databaseUrl).hostname}`);
+
+export const localDatabaseUrl = withHost('localhost', '5432');

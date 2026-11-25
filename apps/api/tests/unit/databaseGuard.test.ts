@@ -14,8 +14,9 @@ import { devDatabaseUrl, localDatabaseUrl, testDatabaseUrl } from '../mocks/data
 
 describe('database identity', () => {
   it('treats the same host and database as the same database', () => {
-    const withExtraParam = `${devDatabaseUrl}&application_name=radpair`;
-    expect(isSameDatabase(devDatabaseUrl, withExtraParam)).toBe(true);
+    const withExtraParam = new URL(devDatabaseUrl);
+    withExtraParam.searchParams.set('application_name', 'radpair');
+    expect(isSameDatabase(devDatabaseUrl, withExtraParam.toString())).toBe(true);
   });
 
   it('treats two Neon projects as different databases', () => {

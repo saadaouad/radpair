@@ -23,7 +23,10 @@ export default defineConfig({
         test: {
           name: 'api-unit',
           environment: 'node',
-          include: ['apps/api/tests/unit/**/*.test.ts']
+          include: ['apps/api/tests/unit/**/*.test.ts'],
+          env: {
+            DATABASE_URL: 'postgresql://owner:secret@dev.example/radpair?sslmode=require'
+          }
         }
       },
       {
