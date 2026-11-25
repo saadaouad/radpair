@@ -10,7 +10,7 @@ const apiErrorCodes = [
   'internal_error'
 ] as const;
 
-const apiErrorCodeSchema = z.enum(apiErrorCodes);
+export const apiErrorCodeSchema = z.enum(apiErrorCodes);
 
 export const apiErrorSchema = z.object({
   error: z.object({

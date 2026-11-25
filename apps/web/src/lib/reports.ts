@@ -20,6 +20,21 @@ export class ReportSaveError extends Error {
   }
 }
 
+export const readSaveError = (error: unknown): ReportSaveError | null => {
+  if (error instanceof ReportSaveError) {
+    return error;
+  }
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { name?: unknown }).name === 'ReportSaveError' &&
+    typeof (error as { status?: unknown }).status === 'number'
+  ) {
+    return error as ReportSaveError;
+  }
+  return null;
+};
+
 export const throwForFailedReport = async (
   response: Response,
   fallback: string

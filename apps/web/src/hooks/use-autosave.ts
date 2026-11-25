@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBlocker } from 'react-router';
 
 import { useMutation } from '@/hooks/use-mutation.ts';
-import { ReportSaveError, type ReportConflict } from '@/lib/reports.ts';
+import { readSaveError, type ReportConflict } from '@/lib/reports.ts';
 
 const saveDelayMs = 800;
 const retryDelayMs = 400;
@@ -22,10 +22,11 @@ const statusLabel: Record<SaveStatus, string> = {
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const retryable = (error: unknown) => {
-  if (!(error instanceof ReportSaveError)) {
+  const saveError = readSaveError(error);
+  if (!saveError) {
     return true;
   }
-  return error.status === 500 || error.status === 503;
+  return saveError.status === 500 || saveError.status === 503;
 };
 
 export const useReportAutosave = ({
@@ -50,7 +51,11 @@ export const useReportAutosave = ({
   const versionRef = useRef(initialVersion);
   const statusRef = useRef<SaveStatus>('saved');
   const inFlight = useRef(false);
+  const inflightSerialized = useRef<string | null>(null);
   const queued = useRef(false);
+  const conflictLock = useRef<ReportConflict | null>(null);
+  const attempt = useRef(0);
+  const disposed = useRef(false);
   const timer = useRef<number | null>(null);
   const suppress = useRef(false);
   const flushingLeave = useRef(false);
@@ -59,7 +64,9 @@ export const useReportAutosave = ({
   const messageRef = useRef('');
   const setMessage = useCallback((next: string) => {
     messageRef.current = next;
-    setMessageState(next);
+    if (!disposed.current) {
+      setMessageState(next);
+    }
   }, []);
   const [conflict, setConflict] = useState<ReportConflict | null>(null);
   const { mutate } = useMutation<ReportResponse>();
@@ -78,14 +85,41 @@ export const useReportAutosave = ({
 
   const setSaveStatus = useCallback((next: SaveStatus) => {
     statusRef.current = next;
-    setStatus(next);
+    if (!disposed.current) {
+      setStatus(next);
+    }
+  }, []);
+  const readStatus = () => statusRef.current;
+
+  const lockConflict = useCallback(
+    (next: ReportConflict, nextMessage: string) => {
+      conflictLock.current = next;
+      queued.current = false;
+      if (timer.current !== null) {
+        window.clearTimeout(timer.current);
+        timer.current = null;
+      }
+      if (!disposed.current) {
+        setConflict(next);
+      }
+      setSaveStatus('conflict');
+      setMessage(nextMessage);
+    },
+    [setMessage, setSaveStatus]
+  );
+
+  const unlockConflict = useCallback(() => {
+    conflictLock.current = null;
   }, []);
 
   // baseline is a stable ref shared with the editor.
   // biome-ignore lint/correctness/useExhaustiveDependencies: baseline is a stable ref
   const flush = useCallback(async () => {
+    if (disposed.current || conflictLock.current) {
+      return;
+    }
     const current = editorRef.current;
-    if (!current || readOnly || statusRef.current === 'conflict') {
+    if (!current || readOnly || readStatus() === 'conflict') {
       return;
     }
     if (timer.current !== null) {
@@ -101,23 +135,28 @@ export const useReportAutosave = ({
       return;
     }
     if (inFlight.current) {
-      queued.current = true;
+      if (serialized !== inflightSerialized.current) {
+        queued.current = true;
+      }
       return;
     }
 
+    const mine = attempt.current + 1;
+    attempt.current = mine;
     inFlight.current = true;
+    inflightSerialized.current = serialized;
     setSaveStatus('saving');
     setMessage('');
     try {
       let saved: ReportResponse | null = null;
       let lastError: unknown;
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      for (let tryNumber = 0; tryNumber < 2; tryNumber += 1) {
         try {
           saved = await save(content);
           break;
         } catch (error) {
           lastError = error;
-          if (attempt === 0 && retryable(error)) {
+          if (!disposed.current && tryNumber === 0 && retryable(error)) {
             await wait(retryDelayMs);
             continue;
           }
@@ -126,6 +165,14 @@ export const useReportAutosave = ({
       }
       if (!saved) {
         throw lastError;
+      }
+      if (
+        disposed.current ||
+        conflictLock.current ||
+        mine !== attempt.current ||
+        readStatus() === 'conflict'
+      ) {
+        return;
       }
       versionRef.current = saved.version;
       baseline.current = serialized;
@@ -139,27 +186,48 @@ export const useReportAutosave = ({
       }
     } catch (error) {
       queued.current = false;
-      if (error instanceof ReportSaveError && error.status === 409 && error.conflict) {
-        setConflict(error.conflict);
-        setSaveStatus('conflict');
-        setMessage(error.message);
+      if (disposed.current || mine !== attempt.current) {
+        return;
+      }
+      const saveError = readSaveError(error);
+      if (saveError?.status === 409 && saveError.conflict) {
+        lockConflict(saveError.conflict, saveError.message);
       } else {
         setSaveStatus('failed');
-        setMessage(error instanceof Error ? error.message : 'The report could not be saved.');
+        setMessage(
+          saveError?.message ??
+            (error instanceof Error ? error.message : 'The report could not be saved.')
+        );
       }
     } finally {
-      inFlight.current = false;
-      if (queued.current) {
+      if (inflightSerialized.current === serialized) {
+        inFlight.current = false;
+        inflightSerialized.current = null;
+        const followUp =
+          !disposed.current &&
+          mine === attempt.current &&
+          queued.current &&
+          !conflictLock.current &&
+          readStatus() !== 'conflict';
         queued.current = false;
-        void flush();
+        if (followUp) {
+          void flush();
+        }
       }
     }
-  }, [readOnly, save, setMessage, setSaveStatus]);
+  }, [lockConflict, readOnly, save, setMessage, setSaveStatus]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: baseline is a stable ref
   const schedule = useCallback(() => {
     const current = editorRef.current;
-    if (!current || readOnly || suppress.current || statusRef.current === 'conflict') {
+    if (
+      disposed.current ||
+      conflictLock.current ||
+      !current ||
+      readOnly ||
+      suppress.current ||
+      statusRef.current === 'conflict'
+    ) {
       return;
     }
     if (baseline.current === null) {
@@ -194,6 +262,7 @@ export const useReportAutosave = ({
     if (!current || !conflict) {
       return;
     }
+    unlockConflict();
     suppress.current = true;
     current.commands.setContent(conflict.content);
     baseline.current = JSON.stringify(current.getJSON());
@@ -202,18 +271,19 @@ export const useReportAutosave = ({
     setConflict(null);
     setMessage('');
     setSaveStatus('saved');
-  }, [conflict, setMessage, setSaveStatus]);
+  }, [conflict, setMessage, setSaveStatus, unlockConflict]);
 
   const overwrite = useCallback(() => {
-    if (!conflict) {
+    if (disposed.current || !conflict) {
       return;
     }
+    unlockConflict();
     versionRef.current = conflict.version;
     setConflict(null);
     setMessage('');
     setSaveStatus('unsaved');
     void flush();
-  }, [conflict, flush, setMessage, setSaveStatus]);
+  }, [conflict, flush, setMessage, setSaveStatus, unlockConflict]);
 
   const settle = useCallback(async () => {
     await flush();
@@ -232,26 +302,21 @@ export const useReportAutosave = ({
         window.clearTimeout(timer.current);
         timer.current = null;
       }
+      unlockConflict();
       versionRef.current = nextVersion;
       baseline.current = serialized;
       setConflict(null);
       setMessage('');
       setSaveStatus('saved');
     },
-    [setSaveStatus]
+    [setSaveStatus, unlockConflict]
   );
 
   const noteConflict = useCallback(
     (next: ReportConflict) => {
-      if (timer.current !== null) {
-        window.clearTimeout(timer.current);
-        timer.current = null;
-      }
-      setConflict(next);
-      setMessage('This report was updated somewhere else.');
-      setSaveStatus('conflict');
+      lockConflict(next, 'This report was updated somewhere else.');
     },
-    [setMessage, setSaveStatus]
+    [lockConflict]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: baseline is a stable ref
@@ -265,6 +330,7 @@ export const useReportAutosave = ({
         window.clearTimeout(timer.current);
         timer.current = null;
       }
+      unlockConflict();
       suppress.current = true;
       current.commands.setContent(content);
       baseline.current = JSON.stringify(current.getJSON());
@@ -274,14 +340,15 @@ export const useReportAutosave = ({
       setMessage('');
       setSaveStatus('saved');
     },
-    [setSaveStatus]
+    [setMessage, setSaveStatus, unlockConflict]
   );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: baseline is a stable ref
   useEffect(() => {
+    disposed.current = false;
     const onHide = () => {
       const current = editorRef.current;
-      if (!current || readOnly || statusRef.current === 'conflict') {
+      if (!current || readOnly || conflictLock.current || statusRef.current === 'conflict') {
         return;
       }
       const content = current.getJSON();
@@ -293,6 +360,9 @@ export const useReportAutosave = ({
         return;
       }
       void save(content, true).catch(() => {
+        if (disposed.current || statusRef.current === 'conflict') {
+          return;
+        }
         setSaveStatus('failed');
       });
     };
@@ -304,10 +374,16 @@ export const useReportAutosave = ({
     window.addEventListener('pagehide', onHide);
     window.addEventListener('beforeunload', onLeave);
     return () => {
+      disposed.current = true;
+      attempt.current += 1;
+      inFlight.current = false;
+      inflightSerialized.current = null;
+      queued.current = false;
       window.removeEventListener('pagehide', onHide);
       window.removeEventListener('beforeunload', onLeave);
       if (timer.current !== null) {
         window.clearTimeout(timer.current);
+        timer.current = null;
       }
     };
   }, [readOnly, save, setSaveStatus]);
@@ -338,7 +414,7 @@ export const useReportAutosave = ({
     }
     flushingLeave.current = true;
     const finishLeave = async () => {
-      for (let attempt = 0; attempt < 8; attempt += 1) {
+      for (let pass = 0; pass < 8; pass += 1) {
         if (statusRef.current === 'failed' || statusRef.current === 'conflict') {
           flushingLeave.current = false;
           return;
