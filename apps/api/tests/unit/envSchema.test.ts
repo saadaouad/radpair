@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { envSchema } from '@/envSchema.ts';
 
-const databaseUrl = 'postgresql://owner:secret@localhost:5432/radpair';
+import { localDatabaseUrl } from '../mocks/database.ts';
 
 describe('envSchema', () => {
   it('applies the local defaults', () => {
-    const env = envSchema.parse({ DATABASE_URL: databaseUrl });
+    const env = envSchema.parse({ DATABASE_URL: localDatabaseUrl });
 
     expect(env.NODE_ENV).toBe('development');
     expect(env.APP_ENV).toBe('dev');
@@ -17,7 +17,7 @@ describe('envSchema', () => {
 
   it('splits a comma-separated CORS list', () => {
     const env = envSchema.parse({
-      DATABASE_URL: databaseUrl,
+      DATABASE_URL: localDatabaseUrl,
       CORS_ORIGIN: 'http://localhost:5173, https://radpair.vercel.app'
     });
 

@@ -1,13 +1,18 @@
 import type { ReportResponse, StudyResponse } from '@repo/contracts';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { lazy, Suspense } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 
-import { ReportWorkspace } from '@/components/report/editor.tsx';
 import { StatusBadge } from '@/components/status-badge.tsx';
 import { Button } from '@/components/ui/button.tsx';
+import { useFetch } from '@/hooks/use-fetch.ts';
 import { formatExamDate } from '@/lib/format.ts';
 import { fetchStudyImages, fetchStudyReport } from '@/lib/reports.ts';
 import { fetchStudy } from '@/lib/studies.ts';
+
+const ReportWorkspace = lazy(() =>
+  import('@/components/report/editor.tsx').then((module) => ({ default: module.ReportWorkspace }))
+);
 
 export const StudyPage = () => {
   const { id = '' } = useParams();
@@ -16,22 +21,13 @@ export const StudyPage = () => {
   const search = params.toString();
   const worklistHref = search.length > 0 ? `/?${search}` : '/';
   const enabled = id.length > 0;
-  const study = useQuery({
-    queryKey: ['study', id],
-    queryFn: () => fetchStudy(id),
-    enabled
-  });
-  const images = useQuery({
-    queryKey: ['study-images', id],
-    queryFn: () => fetchStudyImages(id),
-    enabled
-  });
-  const report = useQuery({
-    queryKey: ['study-report', id],
-    queryFn: () => fetchStudyReport(id),
-    enabled
-  });
+  const study = useFetch(['study', id], () => fetchStudy(id), { enabled });
+  const images = useFetch(['study-images', id], () => fetchStudyImages(id), { enabled });
+  const report = useFetch(['study-report', id], () => fetchStudyReport(id), { enabled });
   const failed = study.isError || images.isError || report.isError;
+  const failureMessage = [study.error, images.error, report.error].find(
+    (error): error is Error => error instanceof Error
+  );
 
   const retry = () => {
     void study.refetch();
@@ -48,7 +44,7 @@ export const StudyPage = () => {
       {study.isPending ? <p className="text-sm text-muted-foreground">Loading the study.</p> : null}
       {failed ? (
         <div className="rounded-xl border border-dashed px-4 py-8">
-          <p className="text-sm">This study could not be opened.</p>
+          <p className="text-sm">{failureMessage?.message ?? 'This study could not be opened.'}</p>
           <Button className="mt-4" onClick={retry} type="button" variant="outline">
             Try again
           </Button>
@@ -78,13 +74,17 @@ export const StudyPage = () => {
             </div>
           </dl>
           {images.data && report.data ? (
-            <ReportWorkspace
-              images={images.data}
-              key={report.data.id}
-              onSigned={(signed) => applySignedReport(queryClient, signed)}
-              readOnly={report.data.status === 'signed'}
-              report={report.data}
-            />
+            <Suspense
+              fallback={<p className="text-sm text-muted-foreground">Loading the report.</p>}
+            >
+              <ReportWorkspace
+                images={images.data}
+                key={report.data.id}
+                onSigned={(signed) => applySignedReport(queryClient, signed)}
+                readOnly={report.data.status === 'signed'}
+                report={report.data}
+              />
+            </Suspense>
           ) : (
             <p className="text-sm text-muted-foreground">Loading the report.</p>
           )}

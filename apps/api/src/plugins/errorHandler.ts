@@ -56,6 +56,18 @@ export const toErrorBody = (error: unknown): { status: number; body: ApiErrorBod
     };
   }
 
+  if (isDatabaseUnavailable(error)) {
+    return {
+      status: 503,
+      body: {
+        error: {
+          code: 'database_unavailable',
+          message: 'Database is unavailable'
+        }
+      }
+    };
+  }
+
   const candidate = error as HttpError;
 
   if (candidate.statusCode === 413 || candidate.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
@@ -104,6 +116,52 @@ export const toErrorBody = (error: unknown): { status: number; body: ApiErrorBod
       }
     }
   };
+};
+
+const connectionCodes = new Set([
+  '08000',
+  '08001',
+  '08003',
+  '08004',
+  '08006',
+  '08007',
+  '08P01',
+  '53300',
+  '57P01',
+  '57P02',
+  '57P03',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EAI_AGAIN',
+  'EPIPE',
+  'ETIMEDOUT',
+  'ENOTFOUND'
+]);
+
+const isDatabaseUnavailable = (error: unknown) => {
+  const pending = [error];
+  const seen = new Set<unknown>();
+
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current || typeof current !== 'object' || seen.has(current)) {
+      continue;
+    }
+    seen.add(current);
+
+    const record = current as { code?: unknown; cause?: unknown; errors?: unknown };
+    if (typeof record.code === 'string' && connectionCodes.has(record.code)) {
+      return true;
+    }
+    if (record.cause !== undefined) {
+      pending.push(record.cause);
+    }
+    if (Array.isArray(record.errors)) {
+      pending.push(...record.errors);
+    }
+  }
+
+  return false;
 };
 
 export const registerErrorHandler = (app: FastifyInstance) => {

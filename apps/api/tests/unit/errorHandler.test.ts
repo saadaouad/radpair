@@ -52,4 +52,21 @@ describe('toErrorBody', () => {
     expect(body.body.error.code).toBe('internal_error');
     expect(JSON.stringify(body)).not.toContain('secret');
   });
+
+  it('turns a lost database connection into a 503 without the driver message', () => {
+    const body = toErrorBody(
+      new Error('query failed', {
+        cause: Object.assign(new Error('connect ECONNREFUSED 10.0.0.8:5432'), {
+          code: 'ECONNREFUSED'
+        })
+      })
+    );
+
+    expect(body.status).toBe(503);
+    expect(body.body.error).toEqual({
+      code: 'database_unavailable',
+      message: 'Database is unavailable'
+    });
+    expect(JSON.stringify(body)).not.toContain('10.0.0.8');
+  });
 });

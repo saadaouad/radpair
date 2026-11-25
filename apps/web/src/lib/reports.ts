@@ -40,7 +40,11 @@ export class ReportSaveError extends Error {
 export const fetchStudyImages = async (studyId: string): Promise<StudyImageResponse[]> => {
   const response = await fetch(`${apiUrl}/api/studies/${studyId}/images`);
   if (!response.ok) {
-    throw new Error('The study images could not be loaded.');
+    throw new Error(
+      response.status === 503
+        ? 'The database is unavailable.'
+        : 'The study images could not be loaded.'
+    );
   }
 
   return studyImageListSchema.parse(await response.json()).images;
@@ -49,7 +53,9 @@ export const fetchStudyImages = async (studyId: string): Promise<StudyImageRespo
 export const fetchStudyReport = async (studyId: string): Promise<ReportResponse> => {
   const response = await fetch(`${apiUrl}/api/studies/${studyId}/report`);
   if (!response.ok) {
-    throw new Error('The report could not be loaded.');
+    throw new Error(
+      response.status === 503 ? 'The database is unavailable.' : 'The report could not be loaded.'
+    );
   }
 
   return reportSchema.parse(await response.json());
@@ -62,8 +68,8 @@ const throwForFailedReport = async (response: Response, fallback: string): Promi
   try {
     const parsed = apiErrorSchema.safeParse(await response.json());
     if (parsed.success) {
-      message = parsed.data.error.message;
       code = parsed.data.error.code;
+      message = code === 'internal_error' ? fallback : parsed.data.error.message;
       const details = conflictSchema.safeParse(parsed.data.error.details);
       if (details.success) {
         conflict = details.data;

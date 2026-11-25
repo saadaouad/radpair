@@ -5,16 +5,13 @@ import { imageId, reportId, seedStudies } from '@/db/catalog.ts';
 import { db } from '@/db/connection.ts';
 import { reportRevisions, reports } from '@/db/schema.ts';
 import { createApp } from '@/app.ts';
-
-const findings = {
-  type: 'doc',
-  content: [
-    {
-      type: 'paragraph',
-      content: [{ type: 'text', text: 'No acute finding.' }]
-    }
-  ]
-};
+import {
+  findingsDocument,
+  keyImageDocument,
+  missingId,
+  nestedList,
+  paragraphDocument
+} from '../mocks/documents.ts';
 
 const restore = async (reference: string) => {
   const entry = seedStudies.find((study) => study.patientReference === reference);
@@ -91,7 +88,7 @@ describe('report API', () => {
     const first = await app.inject({
       method: 'PUT',
       url: `/api/reports/${reportId('01')}`,
-      payload: { content: findings, expectedVersion: 1 }
+      payload: { content: findingsDocument, expectedVersion: 1 }
     });
     expect(first.statusCode).toBe(200);
     expect(first.json()).toMatchObject({ version: 2, status: 'draft' });
@@ -99,14 +96,14 @@ describe('report API', () => {
     const stale = await app.inject({
       method: 'PUT',
       url: `/api/reports/${reportId('01')}`,
-      payload: { content: findings, expectedVersion: 1 }
+      payload: { content: findingsDocument, expectedVersion: 1 }
     });
     expect(stale.statusCode).toBe(409);
     expect(stale.json().error.code).toBe('version_conflict');
 
     const stored = await app.inject({ method: 'GET', url: `/api/reports/${reportId('01')}` });
     expect(stored.json().version).toBe(2);
-    expect(stored.json().content).toMatchObject(findings);
+    expect(stored.json().content).toMatchObject(findingsDocument);
 
     const history = await app.inject({
       method: 'GET',
@@ -118,14 +115,8 @@ describe('report API', () => {
   });
 
   it('keeps one document when two saves use the same version', async () => {
-    const left = {
-      type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Left tab.' }] }]
-    };
-    const right = {
-      type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Right tab.' }] }]
-    };
+    const left = paragraphDocument('Left tab.');
+    const right = paragraphDocument('Right tab.');
     const [first, second] = await Promise.all([
       app.inject({
         method: 'PUT',
@@ -157,19 +148,14 @@ describe('report API', () => {
       url: `/api/reports/${reportId('01')}`,
       payload: {
         expectedVersion: 1,
-        content: {
-          type: 'doc',
-          content: [
-            {
-              type: 'keyImage',
-              attrs: { imageId: imageId('02', 1), caption: 'Wrong study' }
-            }
-          ]
-        }
+        content: keyImageDocument(imageId('02', 1), 'Wrong study')
       }
     });
     expect(foreignImage.statusCode).toBe(400);
-    expect(foreignImage.json().error.code).toBe('validation_error');
+    expect(foreignImage.json().error).toMatchObject({
+      code: 'validation_error',
+      message: 'A key image must belong to this study.'
+    });
 
     const nested = await app.inject({
       method: 'PUT',
@@ -183,6 +169,7 @@ describe('report API', () => {
       }
     });
     expect(nested.statusCode).toBe(400);
+    expect(nested.json().error.message).toContain('nested too deeply');
 
     const stored = await app.inject({ method: 'GET', url: `/api/reports/${reportId('01')}` });
     expect(stored.json().version).toBe(1);
@@ -192,7 +179,7 @@ describe('report API', () => {
     const malformed = await app.inject({
       method: 'PUT',
       url: `/api/reports/${reportId('01')}`,
-      payload: { content: findings, expectedVersion: 'one' }
+      payload: { content: findingsDocument, expectedVersion: 'one' }
     });
     expect(malformed.statusCode).toBe(400);
     expect(malformed.json().error.code).toBe('validation_error');
@@ -217,7 +204,7 @@ describe('report API', () => {
     const saved = await app.inject({
       method: 'PUT',
       url: `/api/reports/${reportId('03')}`,
-      payload: { content: findings, expectedVersion: 1 }
+      payload: { content: findingsDocument, expectedVersion: 1 }
     });
     expect(saved.statusCode).toBe(200);
 
@@ -242,10 +229,7 @@ describe('report API', () => {
       method: 'PUT',
       url: `/api/reports/${reportId('03')}`,
       payload: {
-        content: {
-          type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Changed after sign.' }] }]
-        },
+        content: paragraphDocument('Changed after sign.'),
         expectedVersion: 3
       }
     });
@@ -264,7 +248,7 @@ describe('report API', () => {
       status: 'signed',
       version: 3,
       signedAt: signed.json().signedAt,
-      content: findings
+      content: findingsDocument
     });
 
     const history = await app.inject({
@@ -272,7 +256,10 @@ describe('report API', () => {
       url: `/api/reports/${reportId('03')}/history`
     });
     expect(history.statusCode).toBe(200);
-    expect(history.json().revisions.at(-1)).toMatchObject({ version: 3, content: findings });
+    expect(history.json().revisions.at(-1)).toMatchObject({
+      version: 3,
+      content: findingsDocument
+    });
 
     const list = await app.inject({ method: 'GET', url: '/api/studies' });
     const study = (list.json().studies as Array<{ reportId: string; status: string }>).find(
@@ -281,23 +268,71 @@ describe('report API', () => {
     expect(study?.status).toBe('signed');
   });
 
+  it('returns a stored key image with the study images', async () => {
+    const study = seedStudies.find((entry) => entry.patientReference === 'REF-06');
+    if (!study) {
+      throw new Error('Missing seed study');
+    }
+
+    const keyImageId = imageId('06', 1);
+    const report = await app.inject({ method: 'GET', url: `/api/studies/${study.id}/report` });
+    expect(report.statusCode).toBe(200);
+    expect(JSON.stringify(report.json().content)).toContain(keyImageId);
+
+    const images = await app.inject({ method: 'GET', url: `/api/studies/${study.id}/images` });
+    expect(images.statusCode).toBe(200);
+    expect(images.json().images).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: keyImageId, url: '/studies/mr-knee-1.svg' })
+      ])
+    );
+  });
+
+  it('rejects a broken body, an unknown report, and an invalid id', async () => {
+    const broken = await app.inject({
+      method: 'PUT',
+      url: `/api/reports/${reportId('01')}`,
+      headers: { 'content-type': 'application/json' },
+      payload: '{'
+    });
+    expect(broken.statusCode).toBe(400);
+    expect(broken.json().error.code).toBe('validation_error');
+    expect(JSON.stringify(broken.json())).not.toContain('SyntaxError');
+
+    const missing = missingId;
+    const report = await app.inject({ method: 'GET', url: `/api/reports/${missing}` });
+    expect(report.statusCode).toBe(404);
+    expect(report.json().error).toMatchObject({
+      code: 'not_found',
+      message: 'Report not found.'
+    });
+
+    const update = await app.inject({
+      method: 'PUT',
+      url: `/api/reports/${missing}`,
+      payload: { content: findingsDocument, expectedVersion: 1 }
+    });
+    expect(update.statusCode).toBe(404);
+    expect(update.json().error.code).toBe('not_found');
+
+    const images = await app.inject({ method: 'GET', url: `/api/studies/${missing}/images` });
+    expect(images.statusCode).toBe(404);
+    expect(images.json().error.message).toBe('Study not found.');
+
+    const invalid = await app.inject({ method: 'GET', url: '/api/studies/not-a-uuid' });
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json().error.code).toBe('validation_error');
+
+    const stored = await app.inject({ method: 'GET', url: `/api/reports/${reportId('01')}` });
+    expect(stored.json().version).toBe(1);
+  });
+
   it('returns not found for a missing study', async () => {
     const response = await app.inject({
       method: 'GET',
-      url: '/api/studies/00000000-0000-4000-8000-000000000099'
+      url: `/api/studies/${missingId}`
     });
     expect(response.statusCode).toBe(404);
     expect(response.json().error.code).toBe('not_found');
   });
 });
-
-const nestedList = (depth: number): unknown => {
-  if (depth === 0) {
-    return { type: 'paragraph' };
-  }
-
-  return {
-    type: 'bulletList',
-    content: [{ type: 'listItem', content: [nestedList(depth - 1)] }]
-  };
-};

@@ -1,5 +1,4 @@
 import type { StudyResponse } from '@repo/contracts';
-import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
 
 import { StatusBadge } from '@/components/status-badge.tsx';
@@ -14,6 +13,7 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table.tsx';
+import { useFetch } from '@/hooks/use-fetch.ts';
 import { formatExamDate } from '@/lib/format.ts';
 import { fetchStudies } from '@/lib/studies.ts';
 
@@ -47,10 +47,7 @@ export const WorklistPage = () => {
   const requested = params.get('status');
   const status: FilterId = isFilter(requested) ? requested : 'all';
   const query = params.get('q') ?? '';
-  const studies = useQuery({
-    queryKey: ['studies'],
-    queryFn: fetchStudies
-  });
+  const studies = useFetch(['studies'], fetchStudies);
 
   const updateParams = (nextStatus: FilterId, nextQuery: string) => {
     const next = new URLSearchParams(params);

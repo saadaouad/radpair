@@ -4,6 +4,7 @@ import { defineConfig } from 'vitest/config';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const apiSrc = resolve(repoRoot, 'apps/api/src');
+const webSrc = resolve(repoRoot, 'apps/web/src');
 
 const apiAlias = [{ find: /^@\//, replacement: `${apiSrc}/` }];
 
@@ -42,6 +43,20 @@ export default defineConfig({
           hookTimeout: 20_000,
           fileParallelism: false,
           maxWorkers: 1
+        }
+      },
+      {
+        resolve: {
+          alias: [{ find: /^@\//, replacement: `${webSrc}/` }]
+        },
+        esbuild: {
+          jsx: 'automatic'
+        },
+        test: {
+          name: 'web',
+          environment: 'jsdom',
+          include: ['apps/web/tests/**/*.test.tsx'],
+          setupFiles: [resolve(repoRoot, 'apps/web/tests/setup.ts')]
         }
       }
     ]
