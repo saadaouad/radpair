@@ -1,9 +1,10 @@
 import type { StudyImageResponse } from '@repo/contracts';
 import { Dialog } from 'radix-ui';
+import { memo, useMemo } from 'react';
 
 import { Button } from '@/components/ui/button.tsx';
 
-export const ImageDialog = ({
+export const ImageDialog = memo(function ImageDialog({
   images,
   imageId,
   canInsert,
@@ -17,8 +18,11 @@ export const ImageDialog = ({
   onClose: () => void;
   onInsert: () => void;
   onShow: (imageId: string) => void;
-}) => {
-  const ordered = [...images].sort((left, right) => left.position - right.position);
+}) {
+  const ordered = useMemo(
+    () => [...images].sort((left, right) => left.position - right.position),
+    [images]
+  );
   const index = ordered.findIndex((image) => image.id === imageId);
   const image = index >= 0 ? ordered[index] : null;
 
@@ -103,4 +107,4 @@ export const ImageDialog = ({
       </Dialog.Portal>
     </Dialog.Root>
   );
-};
+});

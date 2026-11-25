@@ -1,14 +1,19 @@
-import type { ReportResponse, StudyResponse } from '@repo/contracts';
+import {
+  reportSchema,
+  studyImageListSchema,
+  studySchema,
+  type ReportResponse,
+  type StudyResponse
+} from '@repo/contracts';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { lazy, Suspense } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 
+import { ErrorBoundary } from '@/components/error-boundary.tsx';
 import { StatusBadge } from '@/components/status-badge.tsx';
 import { Button } from '@/components/ui/button.tsx';
 import { useFetch } from '@/hooks/use-fetch.ts';
 import { formatExamDate } from '@/lib/format.ts';
-import { fetchStudyImages, fetchStudyReport } from '@/lib/reports.ts';
-import { fetchStudy } from '@/lib/studies.ts';
 
 const ReportWorkspace = lazy(() =>
   import('@/components/report/editor.tsx').then((module) => ({ default: module.ReportWorkspace }))
@@ -42,12 +47,27 @@ export const StudyPage = () => {
   const search = params.toString();
   const worklistHref = search.length > 0 ? `/?${search}` : '/';
   const enabled = id.length > 0;
-  const study = useFetch(['study', id], () => fetchStudy(id), { enabled });
-  const images = useFetch(['study-images', id], () => fetchStudyImages(id), { enabled });
-  const report = useFetch(['study-report', id], (signal) => fetchStudyReport(id, signal), {
+  const study = useFetch(['study', id], `/api/studies/${id}`, (body) => studySchema.parse(body), {
     enabled,
-    structuralSharing: keepNewerReport
+    fallback: 'The study could not be loaded.',
+    notFound: 'This study is not on the worklist.'
   });
+  const images = useFetch(
+    ['study-images', id],
+    `/api/studies/${id}/images`,
+    (body) => studyImageListSchema.parse(body).images,
+    { enabled, fallback: 'The study images could not be loaded.' }
+  );
+  const report = useFetch(
+    ['study-report', id],
+    `/api/studies/${id}/report`,
+    (body) => reportSchema.parse(body),
+    {
+      enabled,
+      fallback: 'The report could not be loaded.',
+      structuralSharing: keepNewerReport
+    }
+  );
   const failed = study.isError || images.isError || report.isError;
   const failureMessage = [study.error, images.error, report.error].find(
     (error): error is Error => error instanceof Error
@@ -98,18 +118,29 @@ export const StudyPage = () => {
             </div>
           </dl>
           {images.data && report.data ? (
-            <Suspense
-              fallback={<p className="text-sm text-muted-foreground">Loading the report.</p>}
-            >
-              <ReportWorkspace
-                images={images.data}
-                key={report.data.id}
-                onSaved={(saved) => rememberReport(queryClient, saved)}
-                onSigned={(signed) => rememberReport(queryClient, signed)}
-                readOnly={report.data.status === 'signed'}
-                report={report.data}
-              />
-            </Suspense>
+            <ErrorBoundary message="The report could not be shown." resetKey={report.data.id}>
+              <Suspense
+                fallback={<p className="text-sm text-muted-foreground">Loading the report.</p>}
+              >
+                <ReportWorkspace
+                  images={images.data}
+                  key={report.data.id}
+                  onSaved={(saved) => rememberReport(queryClient, saved)}
+                  onSigned={(signed) => rememberReport(queryClient, signed)}
+                  reloadReport={async () => {
+                    const result = await report.refetch();
+                    if (!result.data) {
+                      throw result.error instanceof Error
+                        ? result.error
+                        : new Error('The report could not be loaded.');
+                    }
+                    return result.data;
+                  }}
+                  readOnly={report.data.status === 'signed'}
+                  report={report.data}
+                />
+              </Suspense>
+            </ErrorBoundary>
           ) : (
             <p className="text-sm text-muted-foreground">Loading the report.</p>
           )}

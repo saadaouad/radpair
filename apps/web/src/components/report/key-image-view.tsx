@@ -1,7 +1,7 @@
 import { Fragment } from '@tiptap/pm/model';
 import type { Editor, ReactNodeViewProps } from '@tiptap/react';
 import { NodeViewWrapper } from '@tiptap/react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { KeyImageOptions } from '@/components/report/key-image.ts';
 import { Button } from '@/components/ui/button.tsx';
@@ -45,7 +45,8 @@ export const KeyImageView = ({
   const images = (extension.options as KeyImageOptions).images;
   const imageId = typeof node.attrs.imageId === 'string' ? node.attrs.imageId : '';
   const caption = typeof node.attrs.caption === 'string' ? node.attrs.caption : '';
-  const image = images.find((item) => item.id === imageId);
+  const imagesById = useMemo(() => new Map(images.map((item) => [item.id, item])), [images]);
+  const image = imagesById.get(imageId);
   const [, refresh] = useState(0);
   const position = typeof getPos === 'function' ? getPos() : undefined;
   let canMoveUp = false;

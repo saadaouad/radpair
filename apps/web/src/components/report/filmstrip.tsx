@@ -1,5 +1,5 @@
 import type { StudyImageResponse } from '@repo/contracts';
-import { useRef, useState } from 'react';
+import { memo, useMemo, useRef, useState } from 'react';
 
 import {
   beginStudyImageDrag,
@@ -8,7 +8,7 @@ import {
 } from '@/components/report/study-image-drag.ts';
 import { cn } from '@/lib/utils.ts';
 
-export const Filmstrip = ({
+export const Filmstrip = memo(function Filmstrip({
   images,
   selectedId,
   placedIds,
@@ -22,9 +22,10 @@ export const Filmstrip = ({
   readOnly: boolean;
   onSelect: (imageId: string) => void;
   onExpand: (imageId: string) => void;
-}) => {
+}) {
   const skipClick = useRef(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const placed = useMemo(() => new Set(placedIds), [placedIds]);
 
   return (
     <ul
@@ -33,8 +34,8 @@ export const Filmstrip = ({
     >
       {images.map((image) => {
         const selected = image.id === selectedId;
-        const placed = placedIds.includes(image.id);
-        const draggable = !readOnly && !placed;
+        const placedHere = placed.has(image.id);
+        const draggable = !readOnly && !placedHere;
         return (
           <li className="w-24 shrink-0" key={image.id}>
             <button
@@ -79,7 +80,7 @@ export const Filmstrip = ({
               </span>
               <span className="sr-only">
                 Image {image.position}
-                {placed ? ', already in the report' : draggable ? ', drag into the report' : ''}
+                {placedHere ? ', already in the report' : draggable ? ', drag into the report' : ''}
               </span>
             </button>
           </li>
@@ -87,4 +88,4 @@ export const Filmstrip = ({
       })}
     </ul>
   );
-};
+});

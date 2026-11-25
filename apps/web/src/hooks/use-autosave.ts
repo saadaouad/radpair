@@ -1,9 +1,10 @@
-import type { ReportResponse } from '@repo/contracts';
+import { reportSchema, type ReportResponse } from '@repo/contracts';
 import type { Editor } from '@tiptap/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBlocker } from 'react-router';
 
-import { ReportSaveError, saveReport, type ReportConflict } from '@/lib/reports.ts';
+import { useMutation } from '@/hooks/use-mutation.ts';
+import { ReportSaveError, type ReportConflict } from '@/lib/reports.ts';
 
 const saveDelayMs = 800;
 const retryDelayMs = 400;
@@ -61,6 +62,19 @@ export const useReportAutosave = ({
     setMessageState(next);
   }, []);
   const [conflict, setConflict] = useState<ReportConflict | null>(null);
+  const { mutate } = useMutation<ReportResponse>();
+  const save = useCallback(
+    (content: unknown, keepalive?: boolean) =>
+      mutate({
+        endpoint: `/api/reports/${reportId}`,
+        method: 'PUT',
+        body: { content, expectedVersion: versionRef.current },
+        keepalive,
+        parse: (body) => reportSchema.parse(body),
+        fallback: 'The report could not be saved.'
+      }),
+    [mutate, reportId]
+  );
 
   const setSaveStatus = useCallback((next: SaveStatus) => {
     statusRef.current = next;
@@ -95,11 +109,11 @@ export const useReportAutosave = ({
     setSaveStatus('saving');
     setMessage('');
     try {
-      let saved: Awaited<ReturnType<typeof saveReport>> | null = null;
+      let saved: ReportResponse | null = null;
       let lastError: unknown;
       for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
-          saved = await saveReport(reportId, content, versionRef.current);
+          saved = await save(content);
           break;
         } catch (error) {
           lastError = error;
@@ -140,7 +154,7 @@ export const useReportAutosave = ({
         void flush();
       }
     }
-  }, [readOnly, reportId, setSaveStatus]);
+  }, [readOnly, save, setMessage, setSaveStatus]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: baseline is a stable ref
   const schedule = useCallback(() => {
@@ -278,7 +292,7 @@ export const useReportAutosave = ({
       if (serialized.length > 60_000) {
         return;
       }
-      void saveReport(reportId, content, versionRef.current, { keepalive: true }).catch(() => {
+      void save(content, true).catch(() => {
         setSaveStatus('failed');
       });
     };
@@ -296,7 +310,7 @@ export const useReportAutosave = ({
         window.clearTimeout(timer.current);
       }
     };
-  }, [readOnly, reportId, setSaveStatus]);
+  }, [readOnly, save, setSaveStatus]);
 
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
     if (readOnly || currentLocation.pathname === nextLocation.pathname) {
@@ -356,7 +370,6 @@ export const useReportAutosave = ({
     status,
     label: statusLabel[status],
     message,
-    conflict,
     flush,
     settle,
     version,

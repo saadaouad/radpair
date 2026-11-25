@@ -1,6 +1,7 @@
 import {
   hasReportSubstance,
   parseReportDocument,
+  reportSchema,
   ReportDocumentError,
   type ReportResponse,
   type StudyImageResponse
@@ -19,9 +20,13 @@ import {
   markImageDropTarget
 } from '@/components/report/study-image-drag.ts';
 import { SignDialog } from '@/components/report/sign-dialog.tsx';
-import { useReportAutosave } from '@/components/report/use-autosave.ts';
 import { Button } from '@/components/ui/button.tsx';
-import { ReportSaveError, fetchStudyReport, signReport } from '@/lib/reports.ts';
+import { useReportAutosave } from '@/hooks/use-autosave.ts';
+import { useMutation } from '@/hooks/use-mutation.ts';
+import { ReportSaveError } from '@/lib/reports.ts';
+
+const sameIds = (left: string[], right: string[]) =>
+  left.length === right.length && left.every((id, index) => id === right[index]);
 
 const formats = [
   {
@@ -61,13 +66,15 @@ export const ReportWorkspace = ({
   images,
   readOnly,
   onSigned,
-  onSaved
+  onSaved,
+  reloadReport
 }: {
   report: ReportResponse;
   images: StudyImageResponse[];
   readOnly: boolean;
   onSigned: (report: ReportResponse) => void;
   onSaved?: (report: ReportResponse) => void;
+  reloadReport?: () => Promise<ReportResponse>;
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(images[0]?.id ?? null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -76,6 +83,7 @@ export const ReportWorkspace = ({
   const [signOpen, setSignOpen] = useState(false);
   const [signing, setSigning] = useState(false);
   const [signMessage, setSignMessage] = useState('');
+  const { mutate } = useMutation<ReportResponse>();
   const baseline = useRef<string | null>(null);
   const editorFrame = useRef<HTMLDivElement>(null);
   const autosaveHandlers = useRef({
@@ -158,7 +166,8 @@ export const ReportWorkspace = ({
       setPlacedIds(imageIdsInDocument(current.state.doc));
     },
     onUpdate: ({ editor: current }) => {
-      setPlacedIds(imageIdsInDocument(current.state.doc));
+      const nextIds = imageIdsInDocument(current.state.doc);
+      setPlacedIds((currentIds) => (sameIds(currentIds, nextIds) ? currentIds : nextIds));
       setNotice('');
       autosaveHandlers.current.schedule();
     },
@@ -192,7 +201,7 @@ export const ReportWorkspace = ({
       return;
     }
     autosave.replaceDocument(report.content, report.version);
-  }, [autosave, editor, readOnly, report]);
+  }, [autosave.replaceDocument, autosave.status, autosave.version, editor, readOnly, report]);
 
   const [changed, setChanged] = useState(false);
   useEffect(() => {
@@ -273,6 +282,19 @@ export const ReportWorkspace = ({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [insertSelected]);
 
+  const closeImage = useCallback(() => {
+    setExpandedId(null);
+  }, []);
+  const showImage = useCallback((imageId: string) => {
+    setExpandedId(imageId);
+    setSelectedId(imageId);
+  }, []);
+  const insertExpanded = useCallback(() => {
+    if (insertSelected()) {
+      setExpandedId(null);
+    }
+  }, [insertSelected]);
+
   const confirmSign = async () => {
     if (!editor || readOnly || signing) {
       return;
@@ -308,7 +330,13 @@ export const ReportWorkspace = ({
         return;
       }
 
-      const signed = await signReport(report.id, autosave.version());
+      const signed = await mutate({
+        endpoint: `/api/reports/${report.id}/sign`,
+        method: 'POST',
+        body: { expectedVersion: autosave.version() },
+        parse: (body) => reportSchema.parse(body),
+        fallback: 'The report could not be signed.'
+      });
       autosave.adopt(signed.version, JSON.stringify(editor.getJSON()));
       onSigned(signed);
       setSignOpen(false);
@@ -318,8 +346,8 @@ export const ReportWorkspace = ({
         setSignOpen(false);
         return;
       }
-      if (error instanceof ReportSaveError && error.status === 403) {
-        const latest = await fetchStudyReport(report.studyId);
+      if (error instanceof ReportSaveError && error.status === 403 && reloadReport) {
+        const latest = await reloadReport();
         if (latest.status === 'signed') {
           autosave.replaceDocument(latest.content, latest.version);
           onSigned(latest);
@@ -447,16 +475,9 @@ export const ReportWorkspace = ({
         canInsert={editor !== null && !readOnly && expanded !== null && !expandedIsPlaced}
         imageId={expanded?.id ?? null}
         images={images}
-        onClose={() => setExpandedId(null)}
-        onInsert={() => {
-          if (insertSelected()) {
-            setExpandedId(null);
-          }
-        }}
-        onShow={(imageId) => {
-          setExpandedId(imageId);
-          setSelectedId(imageId);
-        }}
+        onClose={closeImage}
+        onInsert={insertExpanded}
+        onShow={showImage}
       />
       <SignDialog
         message={signMessage}

@@ -1,21 +1,12 @@
-import type { StudyResponse } from '@repo/contracts';
-import { Link, useSearchParams } from 'react-router';
+import { studyListSchema, type StudyResponse } from '@repo/contracts';
+import { useSearchParams } from 'react-router';
 
-import { StatusBadge } from '@/components/status-badge.tsx';
+import { StudyCards } from '@/components/worklist/study-cards.tsx';
+import { StudyTable } from '@/components/worklist/study-table.tsx';
+import { WorklistSkeleton } from '@/components/worklist/worklist-skeleton.tsx';
 import { Button } from '@/components/ui/button.tsx';
 import { Input } from '@/components/ui/input.tsx';
-import { Skeleton } from '@/components/ui/skeleton.tsx';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table.tsx';
 import { useFetch } from '@/hooks/use-fetch.ts';
-import { formatExamDate } from '@/lib/format.ts';
-import { fetchStudies } from '@/lib/studies.ts';
 
 const filters = [
   { id: 'all', label: 'All' },
@@ -47,7 +38,12 @@ export const WorklistPage = () => {
   const requested = params.get('status');
   const status: FilterId = isFilter(requested) ? requested : 'all';
   const query = params.get('q') ?? '';
-  const studies = useFetch(['studies'], fetchStudies);
+  const studies = useFetch(
+    ['studies'],
+    '/api/studies',
+    (body) => studyListSchema.parse(body).studies,
+    { fallback: 'The worklist could not be loaded.' }
+  );
 
   const updateParams = (nextStatus: FilterId, nextQuery: string) => {
     const next = new URLSearchParams(params);
@@ -166,111 +162,5 @@ export const WorklistPage = () => {
         </>
       ) : null}
     </section>
-  );
-};
-
-const StudyTable = ({
-  studies,
-  hrefFor
-}: {
-  studies: StudyResponse[];
-  hrefFor: (id: string) => string;
-}) => {
-  return (
-    <div className="hidden overflow-hidden rounded-xl border lg:block">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Reference</TableHead>
-            <TableHead>Patient</TableHead>
-            <TableHead>Modality</TableHead>
-            <TableHead>Body part</TableHead>
-            <TableHead>Exam date</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {studies.map((study) => (
-            <TableRow key={study.id}>
-              <TableCell>
-                <Link
-                  className="font-medium underline-offset-4 hover:underline focus-visible:underline"
-                  to={hrefFor(study.id)}
-                >
-                  {study.patientReference}
-                  <span className="sr-only">
-                    , {study.patientName}, {study.modality} {study.bodyPart}
-                  </span>
-                </Link>
-              </TableCell>
-              <TableCell>{study.patientName}</TableCell>
-              <TableCell>{study.modality}</TableCell>
-              <TableCell>{study.bodyPart}</TableCell>
-              <TableCell>{formatExamDate(study.performedAt)}</TableCell>
-              <TableCell>
-                <StatusBadge status={study.status} />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
-};
-
-const StudyCards = ({
-  studies,
-  hrefFor
-}: {
-  studies: StudyResponse[];
-  hrefFor: (id: string) => string;
-}) => {
-  return (
-    <ul className="grid gap-3 lg:hidden">
-      {studies.map((study) => (
-        <li key={study.id}>
-          <Link
-            className="block rounded-xl border bg-card p-4 text-card-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-            to={hrefFor(study.id)}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-medium">{study.patientName}</p>
-                <p className="text-sm text-muted-foreground">{study.patientReference}</p>
-              </div>
-              <StatusBadge status={study.status} />
-            </div>
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <dt className="text-muted-foreground">Modality</dt>
-                <dd>{study.modality}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Body part</dt>
-                <dd>{study.bodyPart}</dd>
-              </div>
-              <div className="col-span-2">
-                <dt className="text-muted-foreground">Exam date</dt>
-                <dd>{formatExamDate(study.performedAt)}</dd>
-              </div>
-            </dl>
-          </Link>
-        </li>
-      ))}
-    </ul>
-  );
-};
-
-const WorklistSkeleton = () => {
-  return (
-    <div className="space-y-3" aria-hidden="true">
-      <Skeleton className="h-4 w-24" />
-      <Skeleton className="hidden h-64 w-full lg:block" />
-      <div className="grid gap-3 lg:hidden">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
-      </div>
-    </div>
   );
 };
