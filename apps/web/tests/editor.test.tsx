@@ -302,29 +302,51 @@ it('saves a caption edit and keeps the local text when another tab wins', async 
 
 it('overwrites the other tab only when asked', async () => {
   const user = userEvent.setup();
-  const saves = stubReportSaves();
+  const gate = { allow: false };
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>(async (_input, init) => {
+      if ((init?.method ?? 'GET') !== 'PUT') {
+        return jsonResponse({});
+      }
+      const body = JSON.parse(String(init?.body)) as { content: unknown; expectedVersion: number };
+      if (!gate.allow && JSON.stringify(body.content).includes('again')) {
+        return jsonResponse(
+          {
+            error: {
+              code: 'version_conflict',
+              message: 'This report was updated somewhere else.',
+              details: { version: 4, status: 'draft', content: otherTabDocument }
+            }
+          },
+          409
+        );
+      }
+      return jsonResponse(saved(kneeReport, body.expectedVersion + 1, body.content));
+    })
+  );
 
   renderPage(
     <ReportWorkspace images={kneeImages} onSigned={() => {}} readOnly={false} report={kneeReport} />
   );
 
-  await user.type(await screen.findByRole('textbox', { name: 'Caption' }), ' reviewed');
+  const caption = await screen.findByRole('textbox', { name: 'Caption' });
+  await user.type(caption, ' reviewed');
   expect(screen.getByText('Saving...')).toBeInTheDocument();
-  fireEvent.focusOut(screen.getByRole('textbox', { name: 'Caption' }));
-  await waitFor(() => expect(saves.count).toBe(1));
-  expect(screen.getByText('Saved')).toBeInTheDocument();
-  await user.type(screen.getByRole('textbox', { name: 'Caption' }), ' again');
-  fireEvent.focusOut(screen.getByRole('textbox', { name: 'Caption' }));
-  await waitFor(() => expect(saves.count).toBe(2));
+  fireEvent.focusOut(caption);
+  expect(await screen.findByText('Saved')).toBeInTheDocument();
+  await user.type(caption, ' again');
+  expect(caption).toHaveValue('Edema in the lateral femoral condyle reviewed again');
+  fireEvent.focusOut(caption);
   expect(await screen.findByText('Conflict')).toBeInTheDocument();
+  expect(caption).toHaveValue('Edema in the lateral femoral condyle reviewed again');
 
+  gate.allow = true;
   await user.click(screen.getByRole('button', { name: 'Overwrite with mine' }));
 
-  await waitFor(() => expect(saves.count).toBe(3));
+  expect(await screen.findByText('Saved')).toBeInTheDocument();
   expect(screen.queryByText('Conflict')).not.toBeInTheDocument();
-  expect(screen.getByRole('textbox', { name: 'Caption' })).toHaveValue(
-    'Edema in the lateral femoral condyle reviewed again'
-  );
+  expect(caption).toHaveValue('Edema in the lateral femoral condyle reviewed again');
 });
 
 it('keeps a signed report read-only', async () => {
