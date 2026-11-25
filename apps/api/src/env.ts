@@ -74,6 +74,3 @@ if (env.APP_ENV === 'test') {
 }
 
 export { env };
-export const isDev = () => env.APP_ENV === 'dev';
-export const isTest = () => env.APP_ENV === 'test';
-export const isProd = () => env.APP_ENV === 'prod';

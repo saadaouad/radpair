@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 
-export const databaseIdentity = (connectionString: string) => {
+const databaseIdentity = (connectionString: string) => {
   const url = new URL(connectionString);
   return `${url.host}${url.pathname}`;
 };

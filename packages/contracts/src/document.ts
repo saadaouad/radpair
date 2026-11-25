@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-export const maxDocumentDepth = 12;
-export const maxDocumentNodes = 2000;
-export const maxCaptionLength = 240;
-export const maxTextLength = 10_000;
+const maxDocumentDepth = 12;
+const maxDocumentNodes = 2000;
+const maxCaptionLength = 240;
+const maxTextLength = 10_000;
 
 const nodeTypes = [
   'doc',
@@ -33,7 +33,7 @@ export type ReportNode = {
   marks?: Array<{ type: string }>;
 };
 
-export type ParsedReportDocument = {
+type ParsedReportDocument = {
   content: ReportNode;
   imageIds: string[];
   hasText: boolean;

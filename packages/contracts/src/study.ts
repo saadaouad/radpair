@@ -29,7 +29,7 @@ export const studyImageListSchema = z.object({
   images: z.array(studyImageSchema)
 });
 
-export const reportNodeSchema = z
+const reportNodeSchema = z
   .object({
     type: z.string()
   })

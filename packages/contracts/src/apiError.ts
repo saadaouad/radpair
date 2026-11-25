@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const apiErrorCodes = [
+const apiErrorCodes = [
   'validation_error',
   'payload_too_large',
   'not_found',
@@ -10,7 +10,7 @@ export const apiErrorCodes = [
   'internal_error'
 ] as const;
 
-export const apiErrorCodeSchema = z.enum(apiErrorCodes);
+const apiErrorCodeSchema = z.enum(apiErrorCodes);
 
 export const apiErrorSchema = z.object({
   error: z.object({

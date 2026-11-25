@@ -5,5 +5,3 @@ export const healthResponseSchema = z.object({
   database: z.literal('up'),
   timestamp: z.string().datetime()
 });
-
-export type HealthResponse = z.infer<typeof healthResponseSchema>;

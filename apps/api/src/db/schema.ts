@@ -1,4 +1,4 @@
-import { relations, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import {
   check,
   index,
@@ -11,7 +11,7 @@ import {
   uuid
 } from 'drizzle-orm/pg-core';
 
-export const reportStatuses = ['unread', 'draft', 'signed'] as const;
+const reportStatuses = ['unread', 'draft', 'signed'] as const;
 export type ReportStatus = (typeof reportStatuses)[number];
 
 export type ReportContent = {
@@ -95,37 +95,5 @@ export const reportRevisions = pgTable(
   ]
 );
 
-export const studiesRelations = relations(studies, ({ many, one }) => ({
-  images: many(studyImages),
-  report: one(reports, {
-    fields: [studies.id],
-    references: [reports.studyId]
-  })
-}));
-
-export const studyImagesRelations = relations(studyImages, ({ one }) => ({
-  study: one(studies, {
-    fields: [studyImages.studyId],
-    references: [studies.id]
-  })
-}));
-
-export const reportsRelations = relations(reports, ({ one, many }) => ({
-  study: one(studies, {
-    fields: [reports.studyId],
-    references: [studies.id]
-  }),
-  revisions: many(reportRevisions)
-}));
-
-export const reportRevisionsRelations = relations(reportRevisions, ({ one }) => ({
-  report: one(reports, {
-    fields: [reportRevisions.reportId],
-    references: [reports.id]
-  })
-}));
-
-export type Study = typeof studies.$inferSelect;
-export type StudyImage = typeof studyImages.$inferSelect;
 export type Report = typeof reports.$inferSelect;
 export type ReportRevision = typeof reportRevisions.$inferSelect;
