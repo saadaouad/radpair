@@ -59,9 +59,6 @@ jobs:
           LOG_LEVEL=silent
           EOF
 
-      - name: Format
-        run: pnpm format
-
       - name: Lint
         run: pnpm lint
 
