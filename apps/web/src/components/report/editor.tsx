@@ -13,6 +13,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Filmstrip } from '@/components/report/filmstrip.tsx';
 import { ImageDialog } from '@/components/report/image-dialog.tsx';
 import { imageIdsInDocument, KeyImage } from '@/components/report/key-image.ts';
+import {
+  insertDroppedStudyImage,
+  isStudyImageDrag,
+  markImageDropTarget
+} from '@/components/report/study-image-drag.ts';
 import { SignDialog } from '@/components/report/sign-dialog.tsx';
 import { useReportAutosave } from '@/components/report/use-autosave.ts';
 import { Button } from '@/components/ui/button.tsx';
@@ -55,12 +60,14 @@ export const ReportWorkspace = ({
   report,
   images,
   readOnly,
-  onSigned
+  onSigned,
+  onSaved
 }: {
   report: ReportResponse;
   images: StudyImageResponse[];
   readOnly: boolean;
   onSigned: (report: ReportResponse) => void;
+  onSaved?: (report: ReportResponse) => void;
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(images[0]?.id ?? null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -70,10 +77,13 @@ export const ReportWorkspace = ({
   const [signing, setSigning] = useState(false);
   const [signMessage, setSignMessage] = useState('');
   const baseline = useRef<string | null>(null);
+  const editorFrame = useRef<HTMLDivElement>(null);
   const autosaveHandlers = useRef({
     schedule: () => {},
     flush: async () => {}
   });
+  const imagesRef = useRef(images);
+  imagesRef.current = images;
   const extensions = useMemo(
     () => [
       StarterKit.configure({
@@ -81,6 +91,7 @@ export const ReportWorkspace = ({
         code: false,
         codeBlock: false,
         hardBreak: false,
+        dropcursor: { color: '#4e9a67', width: 2 },
         horizontalRule: false,
         trailingNode: false,
         link: false,
@@ -102,6 +113,44 @@ export const ReportWorkspace = ({
       attributes: {
         class: 'report-editor min-h-72 px-4 py-3 text-sm leading-6 focus:outline-none',
         'aria-label': 'Report'
+      },
+      handleDrop: (view, event, _slice, moved) => {
+        markImageDropTarget(view.dom, false);
+        if (moved || !view.editable) {
+          return false;
+        }
+        const result = insertDroppedStudyImage(
+          view,
+          event,
+          imagesRef.current.map((image) => image.id)
+        );
+        if (result === 'ignored') {
+          return false;
+        }
+        if (result === 'duplicate') {
+          setNotice('This image is already in the report.');
+        }
+        return true;
+      },
+      handleDOMEvents: {
+        dragover: (view, event) => {
+          if (!view.editable || !isStudyImageDrag(event)) {
+            return false;
+          }
+          event.preventDefault();
+          if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = 'copy';
+          }
+          markImageDropTarget(view.dom, true);
+          return true;
+        },
+        dragleave: (view, event) => {
+          if (event.relatedTarget instanceof Node && view.dom.contains(event.relatedTarget)) {
+            return false;
+          }
+          markImageDropTarget(view.dom, false);
+          return false;
+        }
       }
     },
     onCreate: ({ editor: current }) => {
@@ -123,12 +172,50 @@ export const ReportWorkspace = ({
     reportId: report.id,
     initialVersion: report.version,
     readOnly,
-    baseline
+    baseline,
+    onSaved
   });
   autosaveHandlers.current = {
     schedule: autosave.schedule,
     flush: autosave.flush
   };
+
+  useEffect(() => {
+    if (!editor || readOnly || autosave.status === 'conflict' || autosave.status === 'saving') {
+      return;
+    }
+    if (report.version <= autosave.version()) {
+      return;
+    }
+    const current = JSON.stringify(editor.getJSON());
+    if (baseline.current !== null && current !== baseline.current) {
+      return;
+    }
+    autosave.replaceDocument(report.content, report.version);
+  }, [autosave, editor, readOnly, report]);
+
+  const [changed, setChanged] = useState(false);
+  useEffect(() => {
+    if (autosave.status === 'unsaved' || autosave.status === 'saving') {
+      setChanged(true);
+    }
+  }, [autosave.status]);
+
+  useEffect(() => {
+    const frame = editorFrame.current;
+    if (!frame || readOnly) {
+      return;
+    }
+    const onFocusOut = (event: FocusEvent) => {
+      const next = event.relatedTarget;
+      if (next instanceof Node && frame.contains(next)) {
+        return;
+      }
+      void autosave.flush();
+    };
+    frame.addEventListener('focusout', onFocusOut);
+    return () => frame.removeEventListener('focusout', onFocusOut);
+  }, [autosave.flush, readOnly]);
 
   useEffect(() => {
     editor?.setEditable(!readOnly);
@@ -152,11 +239,11 @@ export const ReportWorkspace = ({
 
   const insertSelected = useCallback(() => {
     if (!editor || readOnly || !selectedId) {
-      return;
+      return false;
     }
     if (imageIdsInDocument(editor.state.doc).includes(selectedId)) {
       setNotice('This image is already in the report.');
-      return;
+      return false;
     }
     const inserted = editor
       .chain()
@@ -165,7 +252,9 @@ export const ReportWorkspace = ({
       .run();
     if (!inserted) {
       setNotice('Place the cursor in the report, then insert the image.');
+      return false;
     }
+    return true;
   }, [editor, readOnly, selectedId]);
 
   useEffect(() => {
@@ -245,7 +334,7 @@ export const ReportWorkspace = ({
   };
 
   const expanded = images.find((image) => image.id === expandedId) ?? null;
-  const selectedIsPlaced = selectedId !== null && placedIds.includes(selectedId);
+  const expandedIsPlaced = expanded !== null && placedIds.includes(expanded.id);
   const pressed = {
     bold: active?.bold ?? false,
     italic: active?.italic ?? false,
@@ -253,7 +342,6 @@ export const ReportWorkspace = ({
     h2: active?.h2 ?? false,
     h3: active?.h3 ?? false
   };
-
   return (
     <div className="space-y-4 pb-24 lg:pb-0">
       <div className="lg:grid lg:grid-cols-[7.5rem_minmax(0,1fr)] lg:items-start lg:gap-6">
@@ -262,19 +350,36 @@ export const ReportWorkspace = ({
           onExpand={setExpandedId}
           onSelect={setSelectedId}
           placedIds={placedIds}
+          readOnly={readOnly}
           selectedId={selectedId}
         />
         <div className="min-w-0 space-y-3">
           <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 px-4 py-3 backdrop-blur lg:static lg:z-auto lg:border-0 lg:bg-transparent lg:p-0">
-            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 lg:mx-0 lg:max-w-none">
-              <div className="min-w-0 space-y-2">
-                <p aria-live="polite" className="text-sm text-muted-foreground">
-                  {readOnly
-                    ? 'This report is signed and can no longer be changed.'
-                    : autosave.label}
-                  {!readOnly && autosave.status === 'failed' ? `. ${autosave.message}` : null}
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-end gap-3 lg:mx-0 lg:max-w-none">
+              {readOnly ? (
+                <p className="mr-auto text-sm text-muted-foreground">
+                  This report is signed and can no longer be changed.
                 </p>
-                {!readOnly && autosave.status === 'conflict' ? (
+              ) : autosave.status === 'failed' ? (
+                <div className="mr-auto flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                  <p aria-live="polite" className="text-sm text-destructive">
+                    {autosave.label}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{autosave.message}</p>
+                  <Button
+                    onClick={() => {
+                      void autosave.flush();
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : autosave.status === 'conflict' ? (
+                <div className="mr-auto min-w-0 space-y-2">
+                  <p className="text-sm text-muted-foreground">Conflict</p>
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm">
                       This report was updated somewhere else. Your text is still in the editor, so
@@ -287,37 +392,26 @@ export const ReportWorkspace = ({
                       Overwrite with mine
                     </Button>
                   </div>
-                ) : null}
-              </div>
-              <div className="flex gap-2">
+                </div>
+              ) : changed ? (
+                <p aria-live="polite" className="mr-auto text-sm text-muted-foreground">
+                  {autosave.label}
+                </p>
+              ) : null}
+              {readOnly ? null : (
                 <Button
-                  disabled={
-                    readOnly ||
-                    autosave.status === 'saved' ||
-                    autosave.status === 'saving' ||
-                    autosave.status === 'conflict'
-                  }
-                  onClick={() => void autosave.flush()}
+                  onClick={() => {
+                    setSignMessage('');
+                    setSignOpen(true);
+                  }}
                   type="button"
-                  variant="outline"
                 >
-                  Save
+                  Sign report
                 </Button>
-                {readOnly ? null : (
-                  <Button
-                    onClick={() => {
-                      setSignMessage('');
-                      setSignOpen(true);
-                    }}
-                    type="button"
-                  >
-                    Sign
-                  </Button>
-                )}
-              </div>
+              )}
             </div>
           </div>
-          <div className="overflow-hidden rounded-xl border bg-card">
+          <div className="overflow-hidden rounded-xl border bg-card" ref={editorFrame}>
             <div className="flex flex-wrap items-center gap-1 border-b p-2">
               {formats.map((format) => (
                 <Button
@@ -336,29 +430,34 @@ export const ReportWorkspace = ({
                   {format.label}
                 </Button>
               ))}
-              <Button
-                aria-keyshortcuts="Control+Shift+K Meta+Shift+K"
-                disabled={readOnly || !editor || !selectedId || selectedIsPlaced}
-                onClick={insertSelected}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                Insert image
-              </Button>
             </div>
             <EditorContent editor={editor} />
           </div>
           {notice ? <p className="text-sm text-muted-foreground">{notice}</p> : null}
           {!readOnly ? (
             <p className="text-xs text-muted-foreground">
-              Select an image, then insert it at the cursor. The shortcut is Shift+Ctrl+K or
-              Shift+⌘K. The same image can be placed once.
+              Drag an image into the report to place it. Drag a placed image to move it. You can
+              also open an image and choose Insert image. The shortcut is Shift+Ctrl+K or Shift+⌘K.
+              The same image can be placed once.
             </p>
           ) : null}
         </div>
       </div>
-      <ImageDialog image={expanded} onClose={() => setExpandedId(null)} />
+      <ImageDialog
+        canInsert={editor !== null && !readOnly && expanded !== null && !expandedIsPlaced}
+        imageId={expanded?.id ?? null}
+        images={images}
+        onClose={() => setExpandedId(null)}
+        onInsert={() => {
+          if (insertSelected()) {
+            setExpandedId(null);
+          }
+        }}
+        onShow={(imageId) => {
+          setExpandedId(imageId);
+          setSelectedId(imageId);
+        }}
+      />
       <SignDialog
         message={signMessage}
         onCancel={() => setSignOpen(false)}

@@ -1,21 +1,31 @@
 import type { StudyImageResponse } from '@repo/contracts';
+import { useRef, useState } from 'react';
 
-import { Button } from '@/components/ui/button.tsx';
+import {
+  beginStudyImageDrag,
+  endStudyImageDrag,
+  writeStudyImageDrag
+} from '@/components/report/study-image-drag.ts';
 import { cn } from '@/lib/utils.ts';
 
 export const Filmstrip = ({
   images,
   selectedId,
   placedIds,
+  readOnly,
   onSelect,
   onExpand
 }: {
   images: StudyImageResponse[];
   selectedId: string | null;
   placedIds: string[];
+  readOnly: boolean;
   onSelect: (imageId: string) => void;
   onExpand: (imageId: string) => void;
 }) => {
+  const skipClick = useRef(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
   return (
     <ul
       aria-label="Study images"
@@ -24,35 +34,54 @@ export const Filmstrip = ({
       {images.map((image) => {
         const selected = image.id === selectedId;
         const placed = placedIds.includes(image.id);
+        const draggable = !readOnly && !placed;
         return (
-          <li className="w-24 shrink-0 space-y-1" key={image.id}>
+          <li className="w-24 shrink-0" key={image.id}>
             <button
               aria-pressed={selected}
               className={cn(
                 'relative block size-24 overflow-hidden rounded-lg border bg-muted',
-                selected && 'ring-2 ring-ring'
+                selected && 'ring-2 ring-ring',
+                draggable && 'cursor-grab active:cursor-grabbing',
+                draggingId === image.id && 'opacity-60'
               )}
-              onClick={() => onSelect(image.id)}
+              draggable={draggable}
+              onClick={() => {
+                if (skipClick.current) {
+                  return;
+                }
+                onSelect(image.id);
+                onExpand(image.id);
+              }}
+              onDragEnd={() => {
+                endStudyImageDrag();
+                setDraggingId(null);
+                window.setTimeout(() => {
+                  skipClick.current = false;
+                }, 0);
+              }}
+              onDragStart={(event) => {
+                skipClick.current = true;
+                setDraggingId(image.id);
+                beginStudyImageDrag(image.id);
+                writeStudyImageDrag(event.dataTransfer, image.id);
+              }}
               type="button"
             >
-              <img alt="" className="size-full object-cover" src={image.thumbnailUrl} />
+              <img
+                alt=""
+                className="pointer-events-none size-full object-cover"
+                draggable={false}
+                src={image.thumbnailUrl}
+              />
               <span className="absolute top-1 left-1 rounded bg-background/90 px-1 text-xs font-medium">
                 {image.position}
               </span>
               <span className="sr-only">
                 Image {image.position}
-                {placed ? ', already in the report' : ''}
+                {placed ? ', already in the report' : draggable ? ', drag into the report' : ''}
               </span>
             </button>
-            <Button
-              className="w-full"
-              onClick={() => onExpand(image.id)}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              View
-            </Button>
           </li>
         );
       })}

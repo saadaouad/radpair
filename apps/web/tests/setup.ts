@@ -30,6 +30,8 @@ Range.prototype.getClientRects = () => {
 };
 
 Element.prototype.scrollIntoView = () => {};
+Element.prototype.setPointerCapture = () => {};
+Element.prototype.releasePointerCapture = () => {};
 
 afterEach(() => {
   cleanup();

@@ -50,8 +50,11 @@ export const fetchStudyImages = async (studyId: string): Promise<StudyImageRespo
   return studyImageListSchema.parse(await response.json()).images;
 };
 
-export const fetchStudyReport = async (studyId: string): Promise<ReportResponse> => {
-  const response = await fetch(`${apiUrl}/api/studies/${studyId}/report`);
+export const fetchStudyReport = async (
+  studyId: string,
+  signal?: AbortSignal
+): Promise<ReportResponse> => {
+  const response = await fetch(`${apiUrl}/api/studies/${studyId}/report`, { signal });
   if (!response.ok) {
     throw new Error(
       response.status === 503 ? 'The database is unavailable.' : 'The report could not be loaded.'

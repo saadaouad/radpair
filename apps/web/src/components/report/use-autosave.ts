@@ -1,3 +1,4 @@
+import type { ReportResponse } from '@repo/contracts';
 import type { Editor } from '@tiptap/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBlocker } from 'react-router';
@@ -7,13 +8,13 @@ import { ReportSaveError, saveReport, type ReportConflict } from '@/lib/reports.
 const saveDelayMs = 800;
 const retryDelayMs = 400;
 
-export type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'failed' | 'conflict';
+type SaveStatus = 'saved' | 'unsaved' | 'saving' | 'failed' | 'conflict';
 
 const statusLabel: Record<SaveStatus, string> = {
   saved: 'Saved',
-  unsaved: 'Unsaved',
-  saving: 'Saving',
-  failed: "Couldn't save",
+  unsaved: 'Saving...',
+  saving: 'Saving...',
+  failed: 'Failed to save',
   conflict: 'Conflict'
 };
 
@@ -31,16 +32,20 @@ export const useReportAutosave = ({
   reportId,
   initialVersion,
   readOnly,
-  baseline
+  baseline,
+  onSaved
 }: {
   editor: Editor | null;
   reportId: string;
   initialVersion: number;
   readOnly: boolean;
   baseline: { current: string | null };
+  onSaved?: (report: ReportResponse) => void;
 }) => {
   const editorRef = useRef(editor);
   editorRef.current = editor;
+  const onSavedRef = useRef(onSaved);
+  onSavedRef.current = onSaved;
   const versionRef = useRef(initialVersion);
   const statusRef = useRef<SaveStatus>('saved');
   const inFlight = useRef(false);
@@ -110,6 +115,7 @@ export const useReportAutosave = ({
       }
       versionRef.current = saved.version;
       baseline.current = serialized;
+      onSavedRef.current?.(saved);
       const latest = editorRef.current ? JSON.stringify(editorRef.current.getJSON()) : serialized;
       if (latest === serialized) {
         setSaveStatus('saved');
@@ -142,6 +148,9 @@ export const useReportAutosave = ({
     if (!current || readOnly || suppress.current || statusRef.current === 'conflict') {
       return;
     }
+    if (baseline.current === null) {
+      return;
+    }
     const serialized = JSON.stringify(current.getJSON());
     if (baseline.current !== null && serialized === baseline.current) {
       if (timer.current !== null) {
@@ -153,7 +162,9 @@ export const useReportAutosave = ({
       }
       return;
     }
-    setSaveStatus(statusRef.current === 'saving' ? 'saving' : 'unsaved');
+    if (statusRef.current !== 'saving') {
+      setSaveStatus('unsaved');
+    }
     if (timer.current !== null) {
       window.clearTimeout(timer.current);
     }
@@ -256,7 +267,7 @@ export const useReportAutosave = ({
   useEffect(() => {
     const onHide = () => {
       const current = editorRef.current;
-      if (!current || readOnly || inFlight.current || statusRef.current === 'conflict') {
+      if (!current || readOnly || statusRef.current === 'conflict') {
         return;
       }
       const content = current.getJSON();
@@ -312,14 +323,33 @@ export const useReportAutosave = ({
       return;
     }
     flushingLeave.current = true;
-    void flush().then(() => {
+    const finishLeave = async () => {
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        if (statusRef.current === 'failed' || statusRef.current === 'conflict') {
+          flushingLeave.current = false;
+          return;
+        }
+        if (
+          !inFlight.current &&
+          statusRef.current !== 'unsaved' &&
+          statusRef.current !== 'saving'
+        ) {
+          break;
+        }
+        await flush();
+        while (inFlight.current) {
+          await wait(30);
+        }
+      }
       if (statusRef.current === 'failed' || statusRef.current === 'conflict') {
+        flushingLeave.current = false;
         return;
       }
       if (blocker.state === 'blocked') {
         blocker.proceed();
       }
-    });
+    };
+    void finishLeave();
   }, [blocker, flush]);
 
   return {

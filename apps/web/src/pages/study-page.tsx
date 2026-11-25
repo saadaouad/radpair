@@ -1,5 +1,5 @@
 import type { ReportResponse, StudyResponse } from '@repo/contracts';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { lazy, Suspense } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 
@@ -14,6 +14,27 @@ const ReportWorkspace = lazy(() =>
   import('@/components/report/editor.tsx').then((module) => ({ default: module.ReportWorkspace }))
 );
 
+const keepNewerReport = (current: ReportResponse | undefined, incoming: ReportResponse) => {
+  if (current && incoming.version < current.version) {
+    return current;
+  }
+  return incoming;
+};
+
+const rememberReport = (queryClient: QueryClient, saved: ReportResponse) => {
+  const reportKey = ['study-report', saved.studyId] as const;
+  void queryClient.cancelQueries({ queryKey: reportKey });
+  queryClient.setQueryData(reportKey, saved);
+  queryClient.setQueryData<StudyResponse>(['study', saved.studyId], (current) =>
+    current ? { ...current, status: saved.status } : current
+  );
+  queryClient.setQueryData<StudyResponse[]>(['studies'], (current) =>
+    current?.map((study) =>
+      study.id === saved.studyId ? { ...study, status: saved.status } : study
+    )
+  );
+};
+
 export const StudyPage = () => {
   const { id = '' } = useParams();
   const queryClient = useQueryClient();
@@ -23,7 +44,10 @@ export const StudyPage = () => {
   const enabled = id.length > 0;
   const study = useFetch(['study', id], () => fetchStudy(id), { enabled });
   const images = useFetch(['study-images', id], () => fetchStudyImages(id), { enabled });
-  const report = useFetch(['study-report', id], () => fetchStudyReport(id), { enabled });
+  const report = useFetch(['study-report', id], (signal) => fetchStudyReport(id, signal), {
+    enabled,
+    structuralSharing: keepNewerReport
+  });
   const failed = study.isError || images.isError || report.isError;
   const failureMessage = [study.error, images.error, report.error].find(
     (error): error is Error => error instanceof Error
@@ -80,7 +104,8 @@ export const StudyPage = () => {
               <ReportWorkspace
                 images={images.data}
                 key={report.data.id}
-                onSigned={(signed) => applySignedReport(queryClient, signed)}
+                onSaved={(saved) => rememberReport(queryClient, saved)}
+                onSigned={(signed) => rememberReport(queryClient, signed)}
                 readOnly={report.data.status === 'signed'}
                 report={report.data}
               />
@@ -91,18 +116,5 @@ export const StudyPage = () => {
         </div>
       ) : null}
     </section>
-  );
-};
-
-const applySignedReport = (
-  queryClient: ReturnType<typeof useQueryClient>,
-  signed: ReportResponse
-) => {
-  queryClient.setQueryData(['study-report', signed.studyId], signed);
-  queryClient.setQueryData<StudyResponse>(['study', signed.studyId], (current) =>
-    current ? { ...current, status: 'signed' } : current
-  );
-  queryClient.setQueryData<StudyResponse[]>(['studies'], (current) =>
-    current?.map((study) => (study.id === signed.studyId ? { ...study, status: 'signed' } : study))
   );
 };
