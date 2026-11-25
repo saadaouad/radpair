@@ -3,7 +3,6 @@ import { render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
-import { StatusPage } from '@/pages/status-page.tsx';
 import { StudyPage } from '@/pages/study-page.tsx';
 import { WorklistPage } from '@/pages/worklist-page.tsx';
 
@@ -26,8 +25,7 @@ export const renderApp = (path: string) => {
   const router = createMemoryRouter(
     [
       { path: '/', element: <WorklistPage /> },
-      { path: '/studies/:id', element: <StudyPage /> },
-      { path: '/status', element: <StatusPage /> }
+      { path: '/studies/:id', element: <StudyPage /> }
     ],
     { initialEntries: [path] }
   );
