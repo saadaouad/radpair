@@ -32,14 +32,21 @@ export const registerStudyRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async () => {
       const rows = await db
-        .select({ study: studies, report: reports })
+        .select({
+          study: studies,
+          reportId: reports.id,
+          reportStatus: reports.status
+        })
         .from(studies)
         .leftJoin(reports, eq(reports.studyId, studies.id))
         .orderBy(statusRank, sql`${studies.performedAt} desc`);
 
       return {
         studies: rows.map((row) =>
-          toStudy(row.study, row.report ? { id: row.report.id, status: row.report.status } : null)
+          toStudy(
+            row.study,
+            row.reportId && row.reportStatus ? { id: row.reportId, status: row.reportStatus } : null
+          )
         )
       };
     }
@@ -55,7 +62,11 @@ export const registerStudyRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (request) => {
       const [row] = await db
-        .select({ study: studies, report: reports })
+        .select({
+          study: studies,
+          reportId: reports.id,
+          reportStatus: reports.status
+        })
         .from(studies)
         .leftJoin(reports, eq(reports.studyId, studies.id))
         .where(eq(studies.id, request.params.id));
@@ -66,7 +77,7 @@ export const registerStudyRoutes: FastifyPluginAsyncZod = async (app) => {
 
       return toStudy(
         row.study,
-        row.report ? { id: row.report.id, status: row.report.status } : null
+        row.reportId && row.reportStatus ? { id: row.reportId, status: row.reportStatus } : null
       );
     }
   );
