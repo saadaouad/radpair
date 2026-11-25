@@ -18,7 +18,7 @@
     "db:seed": "pnpm --filter api db:seed"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.15",
+    "@biomejs/biome": "^2.6.8",
     "@repo/config-biome": "workspace:*",
     "turbo": "^2.9.8",
     "typescript": "5.9.2"

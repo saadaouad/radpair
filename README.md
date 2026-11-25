@@ -37,7 +37,7 @@ pnpm test:integration
 
 **Narrow windows.** From 1024px up, the worklist is a table and the filmstrip sits beside the editor. Below that, the worklist is cards, the filmstrip scrolls sideways, and the save state and Sign stay in a bar pinned to the bottom. The large image is a dialog at both widths.
 
-**API and data.** Studies, images, and one report per study live in Postgres. The report body is the editor JSON, and a key image is `{ "type": "keyImage", "attrs": { "imageId", "caption" } }`. Each save stores a revision of that JSON and increments an integer version. The first save moves unread to draft. Sign sets signed and `signed_at`, and later writes are refused. A save sends `{ content, expectedVersion }`. Errors use `{ error: { code, message, details } }`.
+**API and data.** Studies, images, and one report per study live in Postgres. The report body is the editor JSON, and a key image is `{ "type": "keyImage", "attrs": { "imageId", "caption" } }`. Each save stores a revision of that JSON and increments an integer version. The first save moves unread to draft. Sign sets signed and `signed_at`, and later writes are refused. A save sends `{ content, expectedVersion }`. Errors use `{ error: { code, message, details } }`. The study screen fetches study, images, and report separately (`GET /api/studies/:id`, `…/images`, `…/report`); that is intentional. `GET /api/reports/:id` and `…/history` are for the API contract and tests even though the UI does not call them.
 
 ## Left out
 

@@ -78,6 +78,18 @@ Codes: `validation_error` (400), `payload_too_large` (413), `not_found` (404), `
 
 Save and sign go through one update function. Routes do not update the row themselves.
 
+### Intentional surface (do not remove for “unused from web”)
+
+The study page loads three resources (`GET /api/studies/:id`, `…/images`, `…/report`). Do not merge them into a single “workspace” payload for the baseline; separate routes keep contracts small and caching straightforward.
+
+`GET /api/reports/:id` and `GET /api/reports/:id/history` are not called from the web app. Keep them anyway: the spec lists both, saves and sign target report id, integration tests rely on them, and `report_revisions` backs version checks even though audit history UI is out of scope.
+
+`pnpm --filter api db:placeholders` (`writePlaceholders.ts`) regenerates synthetic SVGs under `apps/web/public/studies`. Seed assets are committed; the script is for maintainers only.
+
+`@fastify/helmet` and `@fastify/cors` stay registered in `app.ts` for production on Render.
+
+`@repo/contracts` re-exports `zod` so the API and web share one Zod version; import `z` from `@repo/contracts`, not a second `zod` dependency in apps.
+
 ## Layout
 
 ```
