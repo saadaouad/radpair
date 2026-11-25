@@ -10,7 +10,7 @@ export type KeyImageOptions = {
   images: StudyImageResponse[];
 };
 
-export const selectKeyImageBesideText = (editor: Editor, direction: -1 | 1) => {
+const selectKeyImageBesideText = (editor: Editor, direction: -1 | 1) => {
   const { state } = editor;
   const { selection } = state;
   if (!(selection instanceof TextSelection) || !selection.empty) {
