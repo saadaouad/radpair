@@ -24,6 +24,15 @@ describe('envSchema', () => {
     expect(env.CORS_ORIGIN).toEqual(['http://localhost:5173', 'https://radpair.vercel.app']);
   });
 
+  it('strips a trailing slash from CORS origins', () => {
+    const env = envSchema.parse({
+      DATABASE_URL: localDatabaseUrl,
+      CORS_ORIGIN: 'https://radpair.vercel.app/'
+    });
+
+    expect(env.CORS_ORIGIN).toEqual(['https://radpair.vercel.app']);
+  });
+
   it('rejects a non-postgres database url', () => {
     const result = envSchema.safeParse({ DATABASE_URL: 'https://example.com/db' });
 
