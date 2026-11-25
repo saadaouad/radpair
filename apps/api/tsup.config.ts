@@ -4,7 +4,7 @@ import { defineConfig } from 'tsup';
 const src = resolve(import.meta.dirname, 'src');
 
 export default defineConfig({
-  entry: ['src/server.ts'],
+  entry: ['src/server.ts', 'src/vercel.ts'],
   format: ['esm'],
   target: 'es2022',
   outDir: 'dist',
