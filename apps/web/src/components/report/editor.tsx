@@ -9,6 +9,7 @@ import {
 import type { Content } from '@tiptap/react';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
+import { Redo2, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Filmstrip } from '@/components/report/filmstrip.tsx';
@@ -25,6 +26,7 @@ import { Button } from '@/components/ui/button.tsx';
 import { useReportAutosave } from '@/hooks/use-autosave.ts';
 import { useMutation } from '@/hooks/use-mutation.ts';
 import { checkReportLaterality, type LateralityWarning } from '@/lib/laterality.ts';
+import { broadcastReportSaved, subscribeReportSaved } from '@/lib/report-broadcast.ts';
 import { ReportSaveError } from '@/lib/reports.ts';
 
 const sameIds = (left: string[], right: string[]) =>
@@ -185,32 +187,73 @@ export const ReportWorkspace = ({
     }
   });
 
+  const handleSaved = useCallback(
+    (saved: ReportResponse) => {
+      broadcastReportSaved(saved.id, {
+        version: saved.version,
+        content: saved.content,
+        status: saved.status
+      });
+      onSaved?.(saved);
+    },
+    [onSaved]
+  );
+
   const autosave = useReportAutosave({
     editor,
     reportId: report.id,
     initialVersion: report.version,
     readOnly,
     baseline,
-    onSaved
+    onSaved: handleSaved
   });
   autosaveHandlers.current = {
     schedule: autosave.schedule,
     flush: autosave.flush
   };
 
+  const reconcileRemoteVersion = useCallback(
+    (incoming: Pick<ReportResponse, 'version' | 'status' | 'content'>) => {
+      if (!editor || readOnly) {
+        return;
+      }
+      if (autosave.status === 'conflict' || autosave.status === 'saving') {
+        return;
+      }
+      if (incoming.version <= autosave.version()) {
+        return;
+      }
+      const current = JSON.stringify(editor.getJSON());
+      const incomingSerialized = JSON.stringify(incoming.content);
+      if (current === incomingSerialized) {
+        autosave.adopt(incoming.version, current);
+        return;
+      }
+      autosave.noteConflict({
+        version: incoming.version,
+        status: incoming.status,
+        content: incoming.content
+      });
+    },
+    [autosave.adopt, autosave.noteConflict, autosave.status, autosave.version, editor, readOnly]
+  );
+
   useEffect(() => {
-    if (!editor || readOnly || autosave.status === 'conflict' || autosave.status === 'saving') {
+    reconcileRemoteVersion({
+      version: report.version,
+      status: report.status,
+      content: report.content
+    });
+  }, [report.content, report.status, report.version, reconcileRemoteVersion]);
+
+  useEffect(() => {
+    if (readOnly) {
       return;
     }
-    if (report.version <= autosave.version()) {
-      return;
-    }
-    const current = JSON.stringify(editor.getJSON());
-    if (baseline.current !== null && current !== baseline.current) {
-      return;
-    }
-    autosave.replaceDocument(report.content, report.version);
-  }, [autosave.replaceDocument, autosave.status, autosave.version, editor, readOnly, report]);
+    return subscribeReportSaved(report.id, (remote) => {
+      reconcileRemoteVersion(remote);
+    });
+  }, [readOnly, report.id, reconcileRemoteVersion]);
 
   const [changed, setChanged] = useState(false);
   useEffect(() => {
@@ -243,14 +286,24 @@ export const ReportWorkspace = ({
     editor,
     selector: ({ editor: current }) => {
       if (!current) {
-        return { bold: false, italic: false, h1: false, h2: false, h3: false };
+        return {
+          bold: false,
+          italic: false,
+          h1: false,
+          h2: false,
+          h3: false,
+          canUndo: false,
+          canRedo: false
+        };
       }
       return {
         bold: current.isActive('bold'),
         italic: current.isActive('italic'),
         h1: current.isActive('heading', { level: 1 }),
         h2: current.isActive('heading', { level: 2 }),
-        h3: current.isActive('heading', { level: 3 })
+        h3: current.isActive('heading', { level: 3 }),
+        canUndo: current.can().undo(),
+        canRedo: current.can().redo()
       };
     }
   });
@@ -417,11 +470,11 @@ export const ReportWorkspace = ({
               ) : autosave.status === 'conflict' ? (
                 <div className="mr-auto min-w-0 space-y-2">
                   <p className="text-sm text-muted-foreground">Conflict</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm">
-                      This report was updated somewhere else. Your text is still in the editor, so
-                      you can copy it before loading the other version.
-                    </p>
+                  <p className="text-sm">
+                    This report was updated somewhere else. Your text is still in the editor, so you
+                    can copy it before loading the other version.
+                  </p>
+                  <div className="flex flex-nowrap items-center gap-2">
                     <Button onClick={autosave.loadLatest} size="sm" type="button" variant="outline">
                       Load latest
                     </Button>
@@ -450,6 +503,33 @@ export const ReportWorkspace = ({
           </div>
           <div className="overflow-hidden rounded-xl border bg-card" ref={editorFrame}>
             <div className="flex flex-wrap items-center gap-1 border-b p-2">
+              {!readOnly && editor ? (
+                <>
+                  <Button
+                    aria-label="Undo"
+                    className="size-8 p-0"
+                    disabled={!active?.canUndo}
+                    onClick={() => editor.chain().focus().undo().run()}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <Undo2 aria-hidden className="size-4" />
+                  </Button>
+                  <Button
+                    aria-label="Redo"
+                    className="size-8 p-0"
+                    disabled={!active?.canRedo}
+                    onClick={() => editor.chain().focus().redo().run()}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <Redo2 aria-hidden className="size-4" />
+                  </Button>
+                  <span aria-hidden className="mx-1 h-6 w-px bg-border" />
+                </>
+              ) : null}
               {formats.map((format) => (
                 <Button
                   aria-pressed={pressed[format.id]}
