@@ -6,7 +6,7 @@ import {
   endStudyImageDrag,
   writeStudyImageDrag
 } from '@/components/report/study-image-drag.ts';
-import { cn } from '@/lib/utils.ts';
+import { cn } from 'cn';
 
 export const Filmstrip = memo(function Filmstrip({
   images,

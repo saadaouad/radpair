@@ -12,15 +12,12 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "lint": "biome check .",
-    "lint:fix": "biome check --write ."
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "zod": "3.25.76"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.8",
     "@repo/config-typescript": "workspace:*",
     "typescript": "5.9.2"
   }

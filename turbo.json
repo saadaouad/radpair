@@ -15,16 +15,7 @@
       "dependsOn": ["^typecheck"]
     },
     "test": {},
-    "test:unit": {},
     "test:integration": {
-      "cache": false
-    },
-    "lint": {},
-    "lint:fix": {
-      "cache": false
-    },
-    "format": {},
-    "format:fix": {
       "cache": false
     }
   }
