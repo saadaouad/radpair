@@ -1,6 +1,8 @@
-import { studyListSchema, type StudyResponse } from '@repo/contracts';
+import { studyListSchema } from '@repo/contracts';
+import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 
+import { ApiErrorNotice, fetchErrorMessage } from '@/components/api-error-notice.tsx';
 import { StudyCards } from '@/components/worklist/study-cards.tsx';
 import { StudyTable } from '@/components/worklist/study-table.tsx';
 import { WorklistSkeleton } from '@/components/worklist/worklist-skeleton.tsx';
@@ -21,16 +23,17 @@ const isFilter = (value: string | null): value is FilterId => {
   return filters.some((filter) => filter.id === value);
 };
 
-const matchesQuery = (study: StudyResponse, query: string) => {
-  const needle = query.trim().toLowerCase();
-  if (needle.length === 0) {
-    return true;
+const studiesEndpoint = (status: FilterId, query: string) => {
+  const params = new URLSearchParams();
+  if (status !== 'all') {
+    params.set('status', status);
   }
-
-  return [study.patientName, study.patientReference, study.modality, study.bodyPart]
-    .join(' ')
-    .toLowerCase()
-    .includes(needle);
+  const trimmed = query.trim();
+  if (trimmed.length > 0) {
+    params.set('search', trimmed);
+  }
+  const serialized = params.toString();
+  return serialized.length > 0 ? `/api/studies?${serialized}` : '/api/studies';
 };
 
 export const WorklistPage = () => {
@@ -38,9 +41,10 @@ export const WorklistPage = () => {
   const requested = params.get('status');
   const status: FilterId = isFilter(requested) ? requested : 'all';
   const query = params.get('q') ?? '';
+  const endpoint = useMemo(() => studiesEndpoint(status, query), [query, status]);
   const studies = useFetch(
-    ['studies'],
-    '/api/studies',
+    ['studies', status, query],
+    endpoint,
     (body) => studyListSchema.parse(body).studies,
     { fallback: 'The worklist could not be loaded.' }
   );
@@ -60,10 +64,7 @@ export const WorklistPage = () => {
     setParams(next, { replace: true });
   };
 
-  const visible = (studies.data ?? []).filter((study) => {
-    const statusMatches = status === 'all' || study.status === status;
-    return statusMatches && matchesQuery(study, query);
-  });
+  const visible = studies.data ?? [];
   const search = params.toString();
   const studyHref = (id: string) =>
     search.length > 0 ? `/studies/${id}?${search}` : `/studies/${id}`;
@@ -120,26 +121,14 @@ export const WorklistPage = () => {
 
       {studies.isPending ? <WorklistSkeleton /> : null}
       {studies.isError ? (
-        <div className="rounded-xl border border-dashed px-4 py-8 text-center">
-          <p className="text-sm">The worklist could not be loaded.</p>
-          <Button
-            className="mt-4"
-            onClick={() => studies.refetch()}
-            type="button"
-            variant="outline"
-          >
-            Try again
-          </Button>
-        </div>
+        <ApiErrorNotice
+          message={fetchErrorMessage(studies.error, 'The worklist could not be loaded.')}
+          onRetry={() => studies.refetch()}
+        />
       ) : null}
-      {studies.data && studies.data.length === 0 ? (
-        <p className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-          No studies are on the worklist.
-        </p>
-      ) : null}
-      {studies.data && studies.data.length > 0 && visible.length === 0 ? (
+      {!studies.isPending && !studies.isError && visible.length === 0 ? (
         <div className="rounded-xl border border-dashed px-4 py-8 text-center">
-          <p className="text-sm text-muted-foreground">No studies match this search.</p>
+          <p className="text-sm text-muted-foreground">No studies match these filters.</p>
           <Button
             className="mt-4"
             onClick={() => updateParams('all', '')}
@@ -150,12 +139,10 @@ export const WorklistPage = () => {
           </Button>
         </div>
       ) : null}
-      {studies.data && visible.length > 0 ? (
+      {visible.length > 0 ? (
         <>
           <p aria-live="polite" className="text-sm text-muted-foreground">
-            {visible.length === studies.data.length
-              ? `${visible.length} studies`
-              : `${visible.length} of ${studies.data.length} studies`}
+            {visible.length === 1 ? '1 study' : `${visible.length} studies`}
           </p>
           <StudyTable hrefFor={studyHref} studies={visible} />
           <StudyCards hrefFor={studyHref} studies={visible} />

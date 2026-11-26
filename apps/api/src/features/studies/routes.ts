@@ -1,5 +1,10 @@
-import { idParamsSchema, studyListSchema, studySchema } from '@repo/contracts';
-import { eq, sql } from 'drizzle-orm';
+import {
+  idParamsSchema,
+  studyListQuerySchema,
+  studyListSchema,
+  studySchema
+} from '@repo/contracts';
+import { and, eq, ilike, or, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { db } from '@/db/connection.ts';
@@ -22,16 +27,38 @@ const toStudy = (
   reportId: report?.id ?? null
 });
 
+const escapeLike = (value: string) => value.replace(/[\\%_]/g, (char) => `\\${char}`);
+
 export const registerStudyRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/studies',
     {
       schema: {
+        querystring: studyListQuerySchema,
         response: { 200: studyListSchema }
       }
     },
-    async () => {
-      const rows = await db
+    async (request) => {
+      const { search, status } = request.query;
+      const filters = [];
+
+      if (status) {
+        filters.push(eq(reports.status, status));
+      }
+
+      if (search) {
+        const pattern = `%${escapeLike(search)}%`;
+        filters.push(
+          or(
+            ilike(studies.patientName, pattern),
+            ilike(studies.patientReference, pattern),
+            ilike(studies.modality, pattern),
+            ilike(studies.bodyPart, pattern)
+          )
+        );
+      }
+
+      const query = db
         .select({
           study: studies,
           reportId: reports.id,
@@ -40,6 +67,8 @@ export const registerStudyRoutes: FastifyPluginAsyncZod = async (app) => {
         .from(studies)
         .leftJoin(reports, eq(reports.studyId, studies.id))
         .orderBy(statusRank, sql`${studies.performedAt} desc`);
+
+      const rows = await (filters.length > 0 ? query.where(and(...filters)) : query);
 
       return {
         studies: rows.map((row) =>

@@ -1,10 +1,10 @@
 import type { ReportResponse } from '@repo/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { createMemoryRouter, Link, RouterProvider } from 'react-router';
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 
 import { NodeSelection } from '@tiptap/pm/state';
 import { EditorView } from '@tiptap/pm/view';
@@ -43,6 +43,10 @@ class DragData {
     return this.values.get(type) ?? '';
   }
 }
+
+afterEach(() => {
+  cleanup();
+});
 
 const saved = (report: ReportResponse, version: number, content: unknown): ReportResponse => ({
   ...report,
@@ -119,20 +123,20 @@ it('moves a key image up and then down again', async () => {
   const caption = () => screen.getByRole('textbox', { name: 'Caption' });
 
   expect(await screen.findByRole('textbox', { name: 'Caption' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Down' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Move image down' })).toBeDisabled();
   expect(follows(heading(), paragraph())).toBe(true);
   expect(follows(paragraph(), caption())).toBe(true);
 
-  await user.click(screen.getByRole('button', { name: 'Up' }));
+  await user.click(screen.getByRole('button', { name: 'Move image up' }));
   expect(follows(heading(), caption())).toBe(true);
   expect(follows(caption(), paragraph())).toBe(true);
 
-  await user.click(screen.getByRole('button', { name: 'Up' }));
-  expect(screen.getByRole('button', { name: 'Up' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: 'Move image up' }));
+  expect(screen.getByRole('button', { name: 'Move image up' })).toBeDisabled();
   expect(follows(caption(), heading())).toBe(true);
   expect(follows(heading(), paragraph())).toBe(true);
 
-  await user.click(screen.getByRole('button', { name: 'Down' }));
+  await user.click(screen.getByRole('button', { name: 'Move image down' }));
   expect(follows(heading(), caption())).toBe(true);
   expect(follows(caption(), paragraph())).toBe(true);
 });
@@ -163,7 +167,7 @@ it('inserts a key image and removes it', async () => {
   expect(screen.getByRole('textbox', { name: 'Caption' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /Image 2/ })).toHaveAttribute('aria-pressed', 'true');
 
-  await user.click(screen.getByRole('button', { name: 'Remove' }));
+  await user.click(screen.getByRole('button', { name: 'Remove image from report' }));
 
   expect(screen.queryByRole('textbox', { name: 'Caption' })).not.toBeInTheDocument();
 });
@@ -281,6 +285,7 @@ it('drops a study image into the report and refuses a second copy', async () => 
 it('saves a caption edit and keeps the local text when another tab wins', async () => {
   const user = userEvent.setup();
   const saves = stubReportSaves();
+  await new Promise((resolve) => setTimeout(resolve, 900));
 
   renderPage(
     <ReportWorkspace
@@ -292,8 +297,11 @@ it('saves a caption edit and keeps the local text when another tab wins', async 
     />
   );
 
+  await screen.findByRole('textbox', { name: 'Caption' });
+  saves.count = 0;
+
   expect(screen.queryByText('Saved')).not.toBeInTheDocument();
-  await user.type(await screen.findByRole('textbox', { name: 'Caption' }), ' reviewed');
+  await user.type(screen.getByRole('textbox', { name: 'Caption' }), ' reviewed');
   expect(screen.getByText('Saving...')).toBeInTheDocument();
   fireEvent.focusOut(screen.getByRole('textbox', { name: 'Caption' }));
   await waitFor(() => expect(saves.count).toBe(1));
@@ -396,7 +404,10 @@ it('keeps a signed report read-only', async () => {
   expect(screen.getByRole('button', { name: 'Bold' })).toBeDisabled();
   expect(screen.getByRole('button', { name: /Image 2/ })).not.toHaveAttribute('draggable', 'true');
   expect(screen.queryByRole('button', { name: 'Insert image' })).not.toBeInTheDocument();
-  expect(await screen.findByRole('textbox', { name: 'Caption' })).toBeDisabled();
+  await screen.findByRole('button', { name: 'View image 1' });
+  const keyImage = document.querySelector('[data-key-image]');
+  expect(keyImage).toHaveTextContent('Edema in the lateral femoral condyle');
+  expect(screen.queryByRole('textbox', { name: 'Caption' })).not.toBeInTheDocument();
   expect(document.querySelector('[data-drag-handle]')).toBeNull();
   await user.click(screen.getByRole('button', { name: /Image 2/ }));
   expect(
@@ -404,7 +415,9 @@ it('keeps a signed report read-only', async () => {
       name: 'Insert image'
     })
   ).toBeDisabled();
-  expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole('button', { name: 'Remove image from report' })
+  ).not.toBeInTheDocument();
 });
 
 it('keeps Saved on screen and shows Saving... while a change is stored', async () => {
@@ -630,6 +643,8 @@ it('shows the saved report when it is opened again', async () => {
   ).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Refresh report' }));
 
+  expect(await screen.findByText('Conflict')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load latest' }));
   expect(await screen.findByText('Updated after leaving.')).toBeInTheDocument();
 });
 
@@ -641,10 +656,41 @@ it('keeps typed text when another report arrives', async () => {
   await user.type(caption, ' local');
   await user.click(screen.getByRole('button', { name: 'Refresh report' }));
 
+  expect(await screen.findByText('Conflict')).toBeInTheDocument();
   expect(screen.getByRole('textbox', { name: 'Caption' })).toHaveValue(
     'Edema in the lateral femoral condyle local'
   );
   expect(screen.queryByText('Updated after leaving.')).not.toBeInTheDocument();
+});
+
+it('flags a newer report from another tab without changing the editor', async () => {
+  const user = userEvent.setup();
+  renderPage(
+    <ReportWorkspace
+      bodyPart={kneeBodyPart}
+      images={kneeImages}
+      onSigned={() => {}}
+      readOnly={false}
+      report={kneeReport}
+    />
+  );
+
+  expect(
+    await screen.findByText('Marrow edema in the lateral femoral condyle.')
+  ).toBeInTheDocument();
+  const channel = new BroadcastChannel(`radpair-report-${kneeReport.id}`);
+  channel.postMessage({
+    tabId: 'other-tab',
+    version: kneeReport.version + 1,
+    status: 'draft',
+    content: reportAfterLeaving.content
+  });
+  channel.close();
+
+  expect(await screen.findByText('Conflict')).toBeInTheDocument();
+  expect(screen.getByText('Marrow edema in the lateral femoral condyle.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Load latest' }));
+  expect(await screen.findByText('Updated after leaving.')).toBeInTheDocument();
 });
 
 it('remembers a saved report for the next visit', async () => {

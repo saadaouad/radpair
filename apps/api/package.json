@@ -19,6 +19,7 @@
     "@fastify/cors": "^11.2.0",
     "@fastify/helmet": "^13.0.2",
     "@repo/contracts": "workspace:*",
+    "@sentry/node": "^11.17.0",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.8.5",
     "fastify-type-provider-zod": "4.0.1",

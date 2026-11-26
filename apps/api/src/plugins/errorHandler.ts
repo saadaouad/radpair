@@ -2,6 +2,8 @@ import type { ApiErrorBody, ApiErrorCode } from '@repo/contracts';
 import { ZodError } from '@repo/contracts';
 import type { FastifyInstance } from 'fastify';
 
+import { Sentry } from '@/instrument.ts';
+
 type HttpError = {
   statusCode?: number;
   code?: string;
@@ -179,6 +181,7 @@ export const registerErrorHandler = (app: FastifyInstance) => {
 
     if (status >= 500) {
       request.log.error(error);
+      Sentry.captureException(error);
     } else {
       request.log.warn(error);
     }

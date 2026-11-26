@@ -46,7 +46,9 @@ Saves send the document and the version the editor loaded. The update runs only 
 
 Autosave waits 800ms, and also flushes on blur and before leaving the page. The visible states are Saved, Saving, Couldn't save, and Conflict. A failed save keeps the text on screen. Leaving during a failed save asks for confirmation.
 
-The study query fills the editor once. A later refetch must not reset it.
+The study query fills the editor once. A later refetch must not reset it. If the server version is newer and JSON differs, show **Conflict** (`noteConflict`); do not call `replaceDocument` silently. If JSON matches, only bump the tracked version (`adopt`). When this tab saves, `broadcastReportSaved` notifies other tabs via `BroadcastChannel` (`lib/report-broadcast.ts`, ignore same `reportTabId`). Conflict actions **Load latest** and **Overwrite with mine** share one button row in the editor chrome.
+
+The web app should stay usable when the API is down: shell, filters, and back links remain; per-resource errors use `ApiErrorNotice` and **Try again** (`use-fetch.ts`, `study-page.tsx`, `worklist-page.tsx`).
 
 At 1024px and above, the worklist is a table and the study page is a filmstrip beside the editor. Below that, the worklist is cards, the filmstrip is a horizontal strip, and the save state and Sign stay in a sticky bar. The large image is a dialog at both widths.
 
@@ -118,7 +120,11 @@ Add these with the report API, not before:
 
 ## Go further
 
-Ship the baseline first. A deterministic laterality check lives in `apps/web/src/lib/laterality.ts`: when `bodyPart` starts with Left or Right, the editor warns if the report text names the opposite side. Signing is not blocked. No model and no API key.
+Ship the baseline first.
+
+**Laterality.** A deterministic laterality check lives in `apps/web/src/lib/laterality.ts`: when `bodyPart` starts with Left or Right, the editor warns if the report text names the opposite side. Signing is not blocked. No model and no API key.
+
+**Operations.** Local start: root `pnpm dev` (Turbo). Optional Sentry: `SENTRY_DSN` (API, skip when empty or `NODE_ENV=test`) and `VITE_SENTRY_DSN` (web). API request logging stays on Pino (`LOG_LEVEL`). UI flow coverage: `apps/web/tests/worklist-page.test.tsx` (worklist through study editor); deeper editor/autosave/conflict tests in `apps/web/tests/editor.test.tsx`.
 
 ## Out of scope
 

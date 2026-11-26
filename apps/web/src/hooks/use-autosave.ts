@@ -176,7 +176,9 @@ export const useReportAutosave = ({
       }
       versionRef.current = saved.version;
       baseline.current = serialized;
-      onSavedRef.current?.(saved);
+      if (!disposed.current) {
+        onSavedRef.current?.(saved);
+      }
       const latest = editorRef.current ? JSON.stringify(editorRef.current.getJSON()) : serialized;
       if (latest === serialized) {
         setSaveStatus('saved');
@@ -359,8 +361,13 @@ export const useReportAutosave = ({
       if (serialized.length > 60_000) {
         return;
       }
-      void save(content, true).catch(() => {
+      void save(content, true).catch((error) => {
         if (disposed.current || statusRef.current === 'conflict') {
+          return;
+        }
+        const saveError = readSaveError(error);
+        if (saveError?.status === 409 && saveError.conflict) {
+          lockConflict(saveError.conflict, saveError.message);
           return;
         }
         setSaveStatus('failed');
@@ -386,7 +393,7 @@ export const useReportAutosave = ({
         timer.current = null;
       }
     };
-  }, [readOnly, save, setSaveStatus]);
+  }, [lockConflict, readOnly, save, setSaveStatus]);
 
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
     if (readOnly || currentLocation.pathname === nextLocation.pathname) {

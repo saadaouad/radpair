@@ -1,3 +1,4 @@
+import '@/instrument.ts';
 import { createApp } from '@/app.ts';
 import { env } from '@/env.ts';
 
