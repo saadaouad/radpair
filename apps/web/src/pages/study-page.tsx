@@ -79,6 +79,16 @@ export const StudyPage = () => {
     void report.refetch();
   };
 
+  const reloadReport = async () => {
+    const result = await report.refetch();
+    if (!result.data) {
+      throw result.error instanceof Error
+        ? result.error
+        : new Error('The report could not be loaded.');
+    }
+    return result.data;
+  };
+
   return (
     <section className="space-y-6">
       <Button asChild className="-ml-2" size="sm" variant="ghost">
@@ -127,15 +137,7 @@ export const StudyPage = () => {
                   key={report.data.id}
                   onSaved={(saved) => rememberReport(queryClient, saved)}
                   onSigned={(signed) => rememberReport(queryClient, signed)}
-                  reloadReport={async () => {
-                    const result = await report.refetch();
-                    if (!result.data) {
-                      throw result.error instanceof Error
-                        ? result.error
-                        : new Error('The report could not be loaded.');
-                    }
-                    return result.data;
-                  }}
+                  reloadReport={reloadReport}
                   readOnly={report.data.status === 'signed'}
                   report={report.data}
                 />
