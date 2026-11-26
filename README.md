@@ -2,6 +2,13 @@
 
 A radiology reporting workspace. The worklist lists studies. The report editor is where the text and key images are written, saved, and signed.
 
+## Deployed
+
+The production web app is on [Vercel](https://radpair.vercel.app). The API runs on [Render](https://radpair-api.onrender.com) and talks to Postgres on Neon. `VITE_API_URL` on Vercel points at the Render service; Render sets `CORS_ORIGIN` to the Vercel URL (and `http://localhost:5173` for local dev). Push to the default branch runs lint, typecheck, unit tests, integration tests, and build in GitHub Actions.
+
+- Web: https://radpair.vercel.app
+- API: https://radpair-api.onrender.com (`GET /health` when Postgres is up)
+
 ## Run locally
 
 Node.js 24, pnpm 11, and two Neon projects (dev and test). Use each project's direct connection string. The host must not contain `-pooler`, and the URL must keep `sslmode=require`.
@@ -41,7 +48,7 @@ pnpm test:integration
 
 ## Left out
 
-No login, roles, DICOM, object storage, dictation, or a generated impression. The optional laterality warning is not built, and the app is not deployed. With another day I would deploy the API and the web app, run lint, typecheck, and tests in CI, then add that warning: if the report names a side that disagrees with the study description, show it and still allow signing. No model.
+No login, roles, DICOM, object storage, dictation, or a generated impression. The optional laterality warning is not built. With another day I would add that warning: if the report names a side that disagrees with the study description, show it and still allow signing. No model.
 
 ## Agents
 
