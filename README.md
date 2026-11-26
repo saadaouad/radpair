@@ -46,12 +46,12 @@ Deterministic, no model. When **body part** starts with Left or Right, the clien
 
 ## Go further: operations
 
-| Piece | What we did |
-| --- | --- |
-| **One-command dev** | `pnpm dev` runs API + web via Turborepo after the setup block above. |
+| Piece                 | What we did                                                                                                                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **One-command dev**   | `pnpm dev` runs API + web via Turborepo after the setup block above.                                                                                                                             |
 | **Full UI flow test** | `apps/web/tests/worklist-page.test.tsx` drives the app with Testing Library: filters/search the worklist, open a study, assert the editor and saved caption (no browser automation; fast in CI). |
-| **Logs** | API **Pino** logs (`LOG_LEVEL`); structured JSON in production on Render. |
-| **Error tracking** | **Sentry** on web (`apps/web/src/instrument.ts`, React error boundary) and API (`apps/api/src/instrument.ts`, 5xx in the error handler). Disabled when DSN is empty or in API tests. |
+| **Logs**              | API **Pino** logs (`LOG_LEVEL`); structured JSON in production on Render.                                                                                                                        |
+| **Error tracking**    | **Sentry** on web (`apps/web/src/instrument.ts`, React error boundary) and API (`apps/api/src/instrument.ts`, 5xx in the error handler). Disabled when DSN is empty or in API tests.             |
 
 Editor and cross-tab behaviour: `apps/web/tests/editor.test.tsx`. Study/API degradation: `apps/web/tests/study-page.test.tsx`, `apps/web/tests/worklist-page.test.tsx`.
 
