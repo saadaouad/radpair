@@ -48,7 +48,7 @@ pnpm test:integration
 
 ## Left out
 
-No login, roles, DICOM, object storage, dictation, or a generated impression. The optional laterality warning is not built. With another day I would add that warning: if the report names a side that disagrees with the study description, show it and still allow signing. No model.
+No login, roles, DICOM, object storage, dictation, or a generated impression. A deterministic laterality warning flags when a left- or right-sided study’s report mentions the opposite side; signing is never blocked. No model. To try it while typing, open an unread study such as **Jonah Hale** (Right hip) or **Elena Voss** (Left shoulder). **Nora Kim** (Left knee) includes conflicting sample text in the seed draft; if that report is already signed, the warning still appears when you open it read-only.
 
 ## Agents
 

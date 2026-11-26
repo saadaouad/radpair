@@ -133,6 +133,7 @@ export const StudyPage = () => {
                 fallback={<p className="text-sm text-muted-foreground">Loading the report.</p>}
               >
                 <ReportWorkspace
+                  bodyPart={study.data.bodyPart}
                   images={images.data}
                   key={report.data.id}
                   onSaved={(saved) => rememberReport(queryClient, saved)}

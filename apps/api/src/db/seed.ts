@@ -20,7 +20,16 @@ for (const entry of seedStudies) {
       bodyPart: entry.bodyPart,
       performedAt: new Date(entry.performedAt)
     })
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: studies.id,
+      set: {
+        patientName: entry.patientName,
+        patientReference: entry.patientReference,
+        modality: entry.modality,
+        bodyPart: entry.bodyPart,
+        performedAt: new Date(entry.performedAt)
+      }
+    });
 
   await db
     .insert(studyImages)

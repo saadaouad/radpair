@@ -1,17 +1,20 @@
 import { Dialog } from 'radix-ui';
 
+import { LateralityAlertBody } from '@/components/report/laterality-alert.tsx';
 import { Button } from '@/components/ui/button.tsx';
 
 export const SignDialog = ({
   open,
   pending,
   message,
+  lateralityWarning,
   onCancel,
   onConfirm
 }: {
   open: boolean;
   pending: boolean;
   message: string;
+  lateralityWarning?: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) => {
@@ -31,6 +34,7 @@ export const SignDialog = ({
           <Dialog.Description className="text-sm text-muted-foreground">
             Signing locks the report. The text and key images cannot be changed afterward.
           </Dialog.Description>
+          {lateralityWarning ? <LateralityAlertBody message={lateralityWarning} /> : null}
           {message ? <p className="text-sm text-destructive">{message}</p> : null}
           <div className="flex justify-end gap-2">
             <Button disabled={pending} onClick={onCancel} type="button" variant="outline">
