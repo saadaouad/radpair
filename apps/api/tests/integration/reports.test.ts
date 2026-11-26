@@ -74,6 +74,19 @@ describe('report API', () => {
     expect(study.statusCode).toBe(200);
     expect(study.json().patientReference).toBe('REF-01');
 
+    const kneeSearch = await app.inject({
+      method: 'GET',
+      url: '/api/studies?search=knee'
+    });
+    expect(kneeSearch.statusCode).toBe(200);
+    const kneeMatches = kneeSearch.json().studies as Array<{ patientName: string }>;
+    expect(kneeMatches.some((row) => row.patientName === 'Nora Kim')).toBe(true);
+
+    const draftOnly = await app.inject({ method: 'GET', url: '/api/studies?status=draft' });
+    expect(
+      draftOnly.json().studies.every((row: { status: string }) => row.status === 'draft')
+    ).toBe(true);
+
     const images = await app.inject({ method: 'GET', url: `/api/studies/${studyId}/images` });
     expect(images.statusCode).toBe(200);
     expect(images.json().images).toHaveLength(4);

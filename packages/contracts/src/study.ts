@@ -13,6 +13,11 @@ export const studySchema = z.object({
   reportId: z.string().uuid().nullable()
 });
 
+export const studyListQuerySchema = z.object({
+  search: z.string().trim().min(1).max(100).optional(),
+  status: reportStatusSchema.optional()
+});
+
 export const studyListSchema = z.object({
   studies: z.array(studySchema)
 });
