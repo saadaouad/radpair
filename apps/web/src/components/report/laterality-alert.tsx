@@ -8,7 +8,3 @@ export const LateralityAlert = ({ message }: { message: string }) => {
     </p>
   );
 };
-
-export const LateralityAlertBody = ({ message }: { message: string }) => {
-  return <p className={lateralityAlertClassName}>{message}</p>;
-};
