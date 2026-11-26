@@ -12,7 +12,21 @@ beforeEach(() => {
   fetchMock.mockImplementation(async (input) => {
     const url = new URL(String(input));
     if (url.pathname === '/api/studies') {
-      return jsonResponse({ studies });
+      const search = url.searchParams.get('search')?.toLowerCase();
+      const status = url.searchParams.get('status');
+      let filtered = studies;
+      if (status) {
+        filtered = filtered.filter((study) => study.status === status);
+      }
+      if (search) {
+        filtered = filtered.filter((study) =>
+          [study.patientName, study.patientReference, study.modality, study.bodyPart]
+            .join(' ')
+            .toLowerCase()
+            .includes(search)
+        );
+      }
+      return jsonResponse({ studies: filtered });
     }
     if (url.pathname === `/api/studies/${kneeStudy.id}`) {
       return jsonResponse(kneeStudy);
@@ -54,6 +68,21 @@ it('renders the worklist and opens a study', async () => {
   expect(await screen.findByRole('textbox', { name: 'Caption' })).toHaveValue(
     'Edema in the lateral femoral condyle'
   );
+});
+
+it('shows when the API cannot be reached', async () => {
+  fetchMock.mockImplementation(async () => {
+    throw new TypeError('Failed to fetch');
+  });
+  renderApp('/');
+
+  expect(
+    await screen.findByText(
+      'The API is unreachable. Check your connection or try again in a moment.'
+    )
+  ).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Worklist' })).toBeInTheDocument();
+  expect(screen.getByRole('textbox', { name: 'Search' })).toBeInTheDocument();
 });
 
 it('lets the reader try the worklist again after a failed load', async () => {

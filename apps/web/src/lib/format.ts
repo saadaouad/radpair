@@ -5,7 +5,18 @@ const examDateFormat = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC'
 });
 
+const signedAtFormat = new Intl.DateTimeFormat('en-GB', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'UTC'
+});
+
 export const formatExamDate = (value: string) => examDateFormat.format(new Date(value));
+
+export const formatSignedAt = (value: string) => signedAtFormat.format(new Date(value));
 
 export const statusLabel = (status: 'unread' | 'draft' | 'signed') => {
   if (status === 'unread') {
