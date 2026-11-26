@@ -118,7 +118,7 @@ Add these with the report API, not before:
 
 ## Go further
 
-Ship the baseline first. The only extra, if the baseline is deployed and the conflict tests pass, is a deterministic laterality check. It warns when the report text names a side that disagrees with the study description. It does not block signing. No model and no API key.
+Ship the baseline first. A deterministic laterality check lives in `apps/web/src/lib/laterality.ts`: when `bodyPart` starts with Left or Right, the editor warns if the report text names the opposite side. Signing is not blocked. No model and no API key.
 
 ## Out of scope
 

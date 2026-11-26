@@ -11,7 +11,6 @@
     "format:fix": "biome format --write .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "test:unit": "turbo run test:unit",
     "test:integration": "turbo run test:integration",
     "db:generate": "pnpm --filter api db:generate",
     "db:migrate": "pnpm --filter api db:migrate",

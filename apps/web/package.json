@@ -8,7 +8,6 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run --config ../../packages/vitest-config/vitest.config.ts --project web",
-    "test:unit": "vitest run --config ../../packages/vitest-config/vitest.config.ts --project web",
     "preview": "vite preview"
   },
   "dependencies": {

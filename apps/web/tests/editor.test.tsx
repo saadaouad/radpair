@@ -18,6 +18,7 @@ import { studyImageDragType } from '@/components/report/study-image-drag.ts';
 import { jsonResponse } from './mocks/http.ts';
 import {
   emptyReport,
+  kneeBodyPart,
   kneeImages,
   kneeReport,
   otherTabDocument,
@@ -80,7 +81,13 @@ const stubReportSaves = () => {
 
 it('restores the report text and its key image', async () => {
   renderPage(
-    <ReportWorkspace images={kneeImages} onSigned={() => {}} readOnly={false} report={kneeReport} />
+    <ReportWorkspace
+      bodyPart={kneeBodyPart}
+      images={kneeImages}
+      onSigned={() => {}}
+      readOnly={false}
+      report={kneeReport}
+    />
   );
 
   expect(screen.getByRole('heading', { name: 'Findings' })).toBeInTheDocument();
@@ -98,7 +105,13 @@ const follows = (first: HTMLElement, second: HTMLElement) =>
 it('moves a key image up and then down again', async () => {
   const user = userEvent.setup();
   renderPage(
-    <ReportWorkspace images={kneeImages} onSigned={() => {}} readOnly={false} report={kneeReport} />
+    <ReportWorkspace
+      bodyPart={kneeBodyPart}
+      images={kneeImages}
+      onSigned={() => {}}
+      readOnly={false}
+      report={kneeReport}
+    />
   );
 
   const heading = () => screen.getByRole('heading', { name: 'Findings' });
@@ -128,6 +141,7 @@ it('inserts a key image and removes it', async () => {
   const user = userEvent.setup();
   renderPage(
     <ReportWorkspace
+      bodyPart={kneeBodyPart}
       images={kneeImages}
       onSigned={() => {}}
       readOnly={false}
@@ -221,6 +235,7 @@ it('keeps a key image when the text beside it is deleted', () => {
 it('drops a study image into the report and refuses a second copy', async () => {
   renderPage(
     <ReportWorkspace
+      bodyPart={kneeBodyPart}
       images={kneeImages}
       onSigned={() => {}}
       readOnly={false}
@@ -268,7 +283,13 @@ it('saves a caption edit and keeps the local text when another tab wins', async 
   const saves = stubReportSaves();
 
   renderPage(
-    <ReportWorkspace images={kneeImages} onSigned={() => {}} readOnly={false} report={kneeReport} />
+    <ReportWorkspace
+      bodyPart={kneeBodyPart}
+      images={kneeImages}
+      onSigned={() => {}}
+      readOnly={false}
+      report={kneeReport}
+    />
   );
 
   expect(screen.queryByText('Saved')).not.toBeInTheDocument();
@@ -327,7 +348,13 @@ it('overwrites the other tab only when asked', async () => {
   );
 
   renderPage(
-    <ReportWorkspace images={kneeImages} onSigned={() => {}} readOnly={false} report={kneeReport} />
+    <ReportWorkspace
+      bodyPart={kneeBodyPart}
+      images={kneeImages}
+      onSigned={() => {}}
+      readOnly={false}
+      report={kneeReport}
+    />
   );
 
   const caption = await screen.findByRole('textbox', { name: 'Caption' });
@@ -353,6 +380,7 @@ it('keeps a signed report read-only', async () => {
   const user = userEvent.setup();
   renderPage(
     <ReportWorkspace
+      bodyPart={kneeBodyPart}
       images={kneeImages}
       onSigned={() => {}}
       readOnly
@@ -394,7 +422,13 @@ it('keeps Saved on screen and shows Saving... while a change is stored', async (
   );
 
   renderPage(
-    <ReportWorkspace images={kneeImages} onSigned={() => {}} readOnly={false} report={kneeReport} />
+    <ReportWorkspace
+      bodyPart={kneeBodyPart}
+      images={kneeImages}
+      onSigned={() => {}}
+      readOnly={false}
+      report={kneeReport}
+    />
   );
 
   expect(screen.queryByText('Saved')).not.toBeInTheDocument();
@@ -433,7 +467,13 @@ it('keeps a failed save on screen until Retry succeeds', async () => {
   );
 
   renderPage(
-    <ReportWorkspace images={kneeImages} onSigned={() => {}} readOnly={false} report={kneeReport} />
+    <ReportWorkspace
+      bodyPart={kneeBodyPart}
+      images={kneeImages}
+      onSigned={() => {}}
+      readOnly={false}
+      report={kneeReport}
+    />
   );
 
   await user.type(await screen.findByRole('textbox', { name: 'Caption' }), ' failed');
@@ -479,6 +519,7 @@ it('saves the report before it leaves the page', async () => {
           <>
             <Link to="/">Back to worklist</Link>
             <ReportWorkspace
+              bodyPart={kneeBodyPart}
               images={kneeImages}
               onSigned={() => {}}
               readOnly={false}
@@ -531,7 +572,13 @@ it('keeps saving when the page closes during a request', async () => {
   );
 
   renderPage(
-    <ReportWorkspace images={kneeImages} onSigned={() => {}} readOnly={false} report={kneeReport} />
+    <ReportWorkspace
+      bodyPart={kneeBodyPart}
+      images={kneeImages}
+      onSigned={() => {}}
+      readOnly={false}
+      report={kneeReport}
+    />
   );
 
   await user.type(await screen.findByRole('textbox', { name: 'Caption' }), ' bye');
@@ -563,7 +610,13 @@ const ReopenHost = () => {
       <button onClick={() => setReport(reportAfterLeaving)} type="button">
         Refresh report
       </button>
-      <ReportWorkspace images={kneeImages} onSigned={() => {}} readOnly={false} report={report} />
+      <ReportWorkspace
+        bodyPart={kneeBodyPart}
+        images={kneeImages}
+        onSigned={() => {}}
+        readOnly={false}
+        report={report}
+      />
     </>
   );
 };
@@ -601,6 +654,7 @@ it('remembers a saved report for the next visit', async () => {
 
   renderPage(
     <ReportWorkspace
+      bodyPart={kneeBodyPart}
       images={kneeImages}
       onSaved={(report) => {
         savedReports.push(report);

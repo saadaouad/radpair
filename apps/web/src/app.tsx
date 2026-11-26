@@ -14,7 +14,7 @@ const PageBoundary = ({ children }: { children: ReactNode }) => {
 const WorkspaceShell = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b bg-[#2e2e2e]">
+      <header className="border-b border-white/10 bg-gray-950">
         <div className="mx-auto flex h-14 max-w-6xl items-center px-4 lg:px-6">
           <NavLink className="text-sm font-semibold tracking-[0.16em]" to="/">
             RADPAIR

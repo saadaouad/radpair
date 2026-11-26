@@ -45,9 +45,6 @@ importers:
         specifier: ^8.20.0
         version: 8.23.1
     devDependencies:
-      '@biomejs/biome':
-        specifier: ^2.6.8
-        version: 2.6.8
       '@repo/config-typescript':
         specifier: workspace:*
         version: link:../../packages/config-typescript
@@ -174,9 +171,6 @@ importers:
         specifier: 3.25.76
         version: 3.25.76
     devDependencies:
-      '@biomejs/biome':
-        specifier: ^2.6.8
-        version: 2.6.8
       '@repo/config-typescript':
         specifier: workspace:*
         version: link:../config-typescript
@@ -187,12 +181,9 @@ importers:
   packages/vitest-config:
     dependencies:
       vitest:
-        specifier: ^4.1.6
+        specifier: ^4.1.12
         version: 4.1.12(@types/node@24.19.2)(jsdom@31.0.1)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
     devDependencies:
-      '@biomejs/biome':
-        specifier: ^2.6.8
-        version: 2.6.8
       '@repo/config-typescript':
         specifier: workspace:*
         version: link:../config-typescript

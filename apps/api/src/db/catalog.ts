@@ -72,7 +72,7 @@ export const seedStudies: SeedStudy[] = [
     'mr-lumbar-spine',
     'Jonah Hale',
     'MR',
-    'Lumbar spine',
+    'Right hip',
     '2026-11-20T11:40:00.000Z',
     'unread',
     emptyReport(),
@@ -94,7 +94,7 @@ export const seedStudies: SeedStudy[] = [
     'us-abdomen',
     'Elena Voss',
     'US',
-    'Abdomen',
+    'Left shoulder',
     '2026-11-21T14:20:00.000Z',
     'unread',
     emptyReport(),
@@ -129,7 +129,9 @@ export const seedStudies: SeedStudy[] = [
       type: 'doc',
       content: [
         heading('Findings'),
-        paragraph('Marrow edema in the lateral femoral condyle.'),
+        paragraph(
+          'Marrow edema in the lateral femoral condyle. Trace fluid tracks along the right joint line.'
+        ),
         {
           type: 'keyImage',
           attrs: {

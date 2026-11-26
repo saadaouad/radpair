@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 
 import type { KeyImageOptions } from '@/components/report/key-image.ts';
 import { Button } from '@/components/ui/button.tsx';
-import { cn } from '@/lib/utils.ts';
+import { cn } from 'cn';
 
 const moveKeyImage = (editor: Editor, pos: number, direction: -1 | 1) => {
   const { state } = editor;

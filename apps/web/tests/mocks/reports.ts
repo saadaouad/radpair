@@ -10,12 +10,14 @@ const timestamps = {
   updatedAt: '2026-11-18T10:15:00.000Z'
 };
 
+export const kneeBodyPart = 'Left knee';
+
 export const kneeStudy: StudyResponse = {
   id: studyId,
   patientName: 'Nora Kim',
   patientReference: 'REF-06',
   modality: 'MR',
-  bodyPart: 'Left knee',
+  bodyPart: kneeBodyPart,
   performedAt: '2026-11-18T10:15:00.000Z',
   status: 'draft',
   reportId

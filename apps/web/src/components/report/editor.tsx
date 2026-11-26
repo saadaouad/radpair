@@ -19,10 +19,12 @@ import {
   isStudyImageDrag,
   markImageDropTarget
 } from '@/components/report/study-image-drag.ts';
+import { LateralityAlert } from '@/components/report/laterality-alert.tsx';
 import { SignDialog } from '@/components/report/sign-dialog.tsx';
 import { Button } from '@/components/ui/button.tsx';
 import { useReportAutosave } from '@/hooks/use-autosave.ts';
 import { useMutation } from '@/hooks/use-mutation.ts';
+import { checkReportLaterality, type LateralityWarning } from '@/lib/laterality.ts';
 import { ReportSaveError } from '@/lib/reports.ts';
 
 const sameIds = (left: string[], right: string[]) =>
@@ -64,6 +66,7 @@ const formats = [
 export const ReportWorkspace = ({
   report,
   images,
+  bodyPart,
   readOnly,
   onSigned,
   onSaved,
@@ -71,6 +74,7 @@ export const ReportWorkspace = ({
 }: {
   report: ReportResponse;
   images: StudyImageResponse[];
+  bodyPart: string;
   readOnly: boolean;
   onSigned: (report: ReportResponse) => void;
   onSaved?: (report: ReportResponse) => void;
@@ -83,6 +87,9 @@ export const ReportWorkspace = ({
   const [signOpen, setSignOpen] = useState(false);
   const [signing, setSigning] = useState(false);
   const [signMessage, setSignMessage] = useState('');
+  const [lateralityWarning, setLateralityWarning] = useState<LateralityWarning | null>(() =>
+    checkReportLaterality(bodyPart, report.content)
+  );
   const { mutate } = useMutation<ReportResponse>();
   const baseline = useRef<string | null>(null);
   const editorFrame = useRef<HTMLDivElement>(null);
@@ -164,11 +171,13 @@ export const ReportWorkspace = ({
     onCreate: ({ editor: current }) => {
       baseline.current = JSON.stringify(current.getJSON());
       setPlacedIds(imageIdsInDocument(current.state.doc));
+      setLateralityWarning(checkReportLaterality(bodyPart, current.getJSON()));
     },
     onUpdate: ({ editor: current }) => {
       const nextIds = imageIdsInDocument(current.state.doc);
       setPlacedIds((currentIds) => (sameIds(currentIds, nextIds) ? currentIds : nextIds));
       setNotice('');
+      setLateralityWarning(checkReportLaterality(bodyPart, current.getJSON()));
       autosaveHandlers.current.schedule();
     },
     onBlur: () => {
@@ -461,6 +470,7 @@ export const ReportWorkspace = ({
             </div>
             <EditorContent editor={editor} />
           </div>
+          {lateralityWarning ? <LateralityAlert message={lateralityWarning.message} /> : null}
           {notice ? <p className="text-sm text-muted-foreground">{notice}</p> : null}
           {!readOnly ? (
             <p className="text-xs text-muted-foreground">
@@ -480,6 +490,7 @@ export const ReportWorkspace = ({
         onShow={showImage}
       />
       <SignDialog
+        lateralityWarning={lateralityWarning?.message}
         message={signMessage}
         onCancel={() => setSignOpen(false)}
         onConfirm={() => void confirmSign()}
