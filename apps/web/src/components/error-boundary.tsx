@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from 'react';
 import { isRouteErrorResponse, Link, useRouteError } from 'react-router';
 
+import { Sentry } from '@/instrument.ts';
 import { Button } from '@/components/ui/button.tsx';
 
 const ErrorNotice = ({ message, action }: { message: string; action: ReactNode }) => {
@@ -53,6 +54,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: unknown) {
     console.error(error);
+    Sentry.captureException(error);
   }
 
   componentDidUpdate(previous: ErrorBoundaryProps) {

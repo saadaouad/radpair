@@ -23,7 +23,8 @@ export const envSchema = z.object({
         .map((origin) => origin.trim().replace(/\/+$/, ''))
         .filter((origin) => origin.length > 0)
     ),
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info')
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  SENTRY_DSN: z.string().default('')
 });
 
 export type Env = z.infer<typeof envSchema>;
